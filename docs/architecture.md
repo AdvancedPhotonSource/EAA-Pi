@@ -37,7 +37,7 @@ Session replacement disposes the current runtime, emits shutdown, reloads resour
 
 `GET /api/events` uses Server-Sent Events. Every connection begins with `snapshot`, including reconnects with Last-Event-ID. Subsequent events carry a monotonically increasing SSE `id` within the primary session. The authoritative snapshot resets the browser's sequence when switching sessions. Messages have stable IDs derived from Pi's role/timestamp/tool-call identity and are replaced during streaming. Terminal updates carry a separate per-terminal sequence. Completed jobs are inserted once using a SQLite unique key.
 
-Event types include `message.created`, `conversation.created`, `conversation.terminated`, `status.changed`, `queue.changed`, `terminal.output.appended`, `terminal.finished`, `approval.requested`, `interrupt.requested`, `interrupt.cleared`, and `log.created`. The browser retains EAA's existing visualization rendering, but the toy workflow uses gallery images rather than a custom scientific visualization backend.
+Event types include `message.created`, `conversation.created`, `conversation.terminated`, `status.changed`, `queue.changed`, `terminal.output.appended`, `terminal.finished`, `approval.requested`, `interrupt.requested`, `interrupt.cleared`, and `log.created`. The toy workflow delivers images through chat messages, displayed in the browser's image panel and gallery.
 
 ## HTTP API
 

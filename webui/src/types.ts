@@ -45,18 +45,6 @@ export type RuntimeLogEntry = {
   total?: number | null;
 };
 
-export type RuntimeVisualizationTile = {
-  id: string;
-  width: number;
-  height: number;
-  content?: {
-    type?: string;
-    image_path?: string;
-    image_url?: string;
-  } | null;
-  updated_at?: string | null;
-};
-
 export type TerminalChunk = {
   stream: "stdout" | "stderr" | string;
   text: string;
@@ -126,7 +114,6 @@ export type RuntimeConversation = {
   status?: string;
   terminated?: boolean;
   messages?: WebUIMessage[];
-  visualization_tiles?: RuntimeVisualizationTile[];
   pending_approval?: PendingApproval | null;
   terminal?: RuntimeTerminal | null;
 };
