@@ -1,0 +1,13 @@
+node_modules
+.runtime
+.demo
+dist
+.git
+.agents
+.codex
+test-results
+playwright-report
+*.tgz
+.playwright-cli
+
+!vendor/*.tgz

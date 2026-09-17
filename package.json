@@ -1,0 +1,62 @@
+{
+  "name": "eaa-pi",
+  "version": "0.1.0",
+  "description": "Standalone EAA web frontend for Pi and community extensions",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "bin": {
+    "eaa-pi": "bin/eaa-pi.mjs"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "extensions",
+    "public",
+    "examples",
+    "scripts",
+    "docs",
+    "README.md",
+    "THIRD_PARTY.md",
+    "npm-shrinkwrap.json",
+    "Dockerfile",
+    "compose.yaml",
+    ".dockerignore",
+    "vendor"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc --noEmit -p webui/tsconfig.json && vite build --config webui/vite.config.ts",
+    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p webui/tsconfig.json",
+    "start": "node bin/eaa-pi.mjs serve",
+    "demo": "node bin/eaa-pi.mjs demo",
+    "test": "node --test --test-force-exit --test-concurrency=1 tests/*.test.mjs",
+    "test:browser": "playwright test",
+    "test:package": "node scripts/package-test.mjs",
+    "test:container": "bash scripts/test-container.sh",
+    "prepack": "node scripts/prepare-pack.mjs"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@earendil-works/pi-agent-core": "0.85.1",
+    "@earendil-works/pi-ai": "0.85.1",
+    "@earendil-works/pi-tui": "0.85.1",
+    "typebox": "1.3.7",
+    "pi-experiment-ops": "file:vendor/pi-experiment-ops-0.1.1.tgz"
+  },
+  "bundledDependencies": [
+    "pi-experiment-ops"
+  ],
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "5.1.1",
+    "lucide-react": "0.468.0",
+    "react": "19.2.1",
+    "react-dom": "19.2.1",
+    "typescript": "5.9.3",
+    "vite": "7.2.6"
+  }
+}

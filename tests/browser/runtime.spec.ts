@@ -1,0 +1,63 @@
+import { test, expect } from "@playwright/test";
+
+test("EAA chat streams once, survives reload, and exposes runtime controls", async ({ page, request }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/");
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+  const input = page.locator("textarea");
+  await input.fill("hello browser");
+  await input.press("Enter");
+  await expect(page.getByText("Demo reply: hello browser", { exact: true })).toHaveCount(1);
+  await page.reload();
+  await expect(page.getByText("Demo reply: hello browser", { exact: true })).toHaveCount(1);
+  await page.getByText("Sessions & tools", { exact: true }).click();
+  await page.getByRole("button", { name: "Run toy workflow", exact: true }).click();
+  await expect.poll(async () => (await (await request.get("/api/state")).json()).conversations.some((c: any) => c.kind === "workflow" && c.messages.some((m: any) => m.role === "assistant")), { timeout: 60000 }).toBeTruthy();
+  await expect.poll(async () => (await (await request.get("/api/workflows")).json()).runs.some((r: any) => r.status === "completed"), { timeout: 60000 }).toBeTruthy();
+  await page.getByRole("button", { name: "Refresh runs", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Resume workflow", exact: true })).toBeVisible({ timeout: 60000 });
+  await page.getByRole("button", { name: "Main Agent", exact: true }).click();
+  await expect(page.getByText("Images (1)", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Launch reviewer", exact: true }).click();
+  await expect.poll(async () => (await (await request.get("/api/state")).json()).conversations.some((c: any) => c.kind === "subagent" && c.messages.length), { timeout: 60000 }).toBeTruthy();
+  await page.getByRole("button", { name: "Open terminal", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Terminal input" })).toBeVisible();
+  await page.getByRole("textbox", { name: "Terminal input" }).fill("printf browser-terminal-ok");
+  await page.getByRole("textbox", { name: "Terminal input" }).press("Enter");
+  await expect(page.locator(".eaa-terminal-output")).toContainText("browser-terminal-ok", { timeout: 15000 });
+  await page.getByRole("button", { name: "Close terminal", exact: true }).click();
+  expect(errors).toEqual([]);
+});
+
+test("pending approval survives reconnect and plan controls block launch", async ({ page, request }) => {
+  await expect.poll(async () => {
+    const state = await (await request.get("/api/state")).json();
+    return state.status === "waiting_for_input" && state.tool_execution_queue.length === 0;
+  }).toBeTruthy();
+  await page.goto("/");
+  await page.getByRole("button", { name: "Main Agent", exact: true }).click();
+  await page.locator("textarea").fill("request approval");
+  await page.locator("textarea").press("Enter");
+  await expect(page.getByRole("button", { name: "Yes", exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Yes", exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "No", exact: true }).click();
+  await expect(page.locator(".eaa-message-tool").filter({ hasText: "Denied" })).toBeVisible();
+  await expect.poll(async () => (await (await request.get("/api/state")).json()).status).toBe("waiting_for_input");
+  await page.getByText("Plan mode", { exact: true }).click();
+  await expect(page.getByRole("switch", { name: "Plan mode" })).toBeChecked();
+  await page.getByText("Sessions & tools", { exact: true }).click();
+  await expect(page.getByRole("button", { name: "Run toy workflow", exact: true })).toBeDisabled();
+  expect((await request.post("/api/terminals", { data: {} })).status()).toBe(409);
+  await page.getByText("Plan mode", { exact: true }).click();
+  await expect(page.getByRole("switch", { name: "Plan mode" })).not.toBeChecked();
+  await expect(page.getByRole("button", { name: "Run toy workflow", exact: true })).toBeEnabled();
+  await page.getByText("Sessions & tools", { exact: true }).click();
+  await page.getByLabel("Upload image").setInputFiles({ name: "toy.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a/lkAAAAASUVORK5CYII=", "base64") });
+  await expect(page.locator("textarea")).toHaveValue(/<img /);
+  await page.locator("textarea").press("Enter");
+  await expect(page.getByText("Image received by the local fixture.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Tools", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Reconnect toy" }).first()).toBeVisible();
+});

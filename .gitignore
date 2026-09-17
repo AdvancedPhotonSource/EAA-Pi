@@ -1,0 +1,16 @@
+.loglogin
+.npmrc
+node_modules/
+dist/
+.runtime/
+.demo/
+test-results/
+playwright-report/
+.playwright-cli/
+*.tgz
+__pycache__/
+vendor/
+.eaa-pi
+
+AGENTS.md
+workspace/

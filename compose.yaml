@@ -1,0 +1,16 @@
+services:
+  eaa-pi:
+    build: .
+    image: eaa-pi:local
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    ports: ["127.0.0.1:8010:8010"]
+    volumes:
+      - ./workspace:/workspace:rw
+      - ./fixtures:/fixtures:ro
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=512m
+    # Use `command: [demo, --workspace, /workspace, --host, 0.0.0.0]` for a credential-free demo.

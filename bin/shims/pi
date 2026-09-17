@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+import { spawn } from "node:child_process";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
+
+const args = process.argv.slice(2);
+const capture = process.env.EAA_PI_CAPTURE_DIR && args.includes("json");
+let file;
+let endsWithNewline = true;
+if (capture) {
+  const childId = randomUUID();
+  mkdirSync(process.env.EAA_PI_CAPTURE_DIR, { recursive: true, mode: 0o700 });
+  file = join(process.env.EAA_PI_CAPTURE_DIR, childId + ".jsonl");
+  appendFileSync(file, JSON.stringify({ type: "eaa_child", id: childId, label: "Workflow agent", kind: "workflow", parent: process.env.EAA_PI_PARENT_SESSION, run: process.env.EAA_PI_WORKFLOW_RUN, task: args.at(-1) }) + "\n", { mode: 0o600 });
+}
+const child = spawn(process.execPath, [join(dirname(fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))), "bundle/cli.js"), ...args], { stdio: ["inherit", capture ? "pipe" : "inherit", "inherit"] });
+if (capture) child.stdout.on("data", chunk => { endsWithNewline = chunk.at(-1) === 10; appendFileSync(file, chunk); process.stdout.write(chunk); });
+for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(signal, () => child.kill(signal));
+child.on("error", error => { console.error(error.message); process.exitCode = 1; });
+child.on("exit", (code, signal) => {
+  if (file) appendFileSync(file, (endsWithNewline ? "" : "\n") + JSON.stringify({ type: "eaa_child_stopped", exitCode: code, signal }) + "\n");
+  process.exitCode = code ?? (signal === "SIGINT" ? 130 : 143);
+});

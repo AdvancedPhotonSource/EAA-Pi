@@ -1,0 +1,7 @@
+{
+  "provider": "YOUR_PROVIDER_NAME",
+  "model": "YOUR_MODEL_ID",
+  "providerWorkspace": "",
+  "host": "127.0.0.1",
+  "port": 8010
+}
