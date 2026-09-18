@@ -14,8 +14,11 @@ test("EAA chat streams once, survives reload, and exposes runtime controls", asy
   await page.getByRole("button", { name: "Expand sessions and tools" }).click();
   await expect(page.getByRole("button", { name: "Run workflow", exact: true })).toBeDisabled();
   await page.getByRole("combobox", { name: "Workflow", exact: true }).selectOption("toy");
-  await expect(page.getByRole("textbox", { name: "Workflow or reviewer task" })).toHaveValue("");
-  await page.getByRole("textbox", { name: "Workflow or reviewer task" }).fill("Three example measurements");
+  await expect(page.getByRole("textbox", { name: "Workflow task" })).toHaveValue("");
+  await expect(page.getByRole("button", { name: "Launch subagent", exact: true })).toBeDisabled();
+  await page.getByRole("textbox", { name: "Subagent task" }).fill("   ");
+  await expect(page.getByRole("button", { name: "Launch subagent", exact: true })).toBeDisabled();
+  await page.getByRole("textbox", { name: "Workflow task" }).fill("Three example measurements");
   await page.getByRole("button", { name: "Run workflow", exact: true }).click();
   await expect.poll(async () => (await (await request.get("/api/state")).json()).conversations.some((c: any) => c.kind === "workflow" && c.messages.some((m: any) => m.role === "assistant")), { timeout: 60000 }).toBeTruthy();
   await expect.poll(async () => (await (await request.get("/api/workflows")).json()).runs.some((r: any) => r.status === "completed"), { timeout: 60000 }).toBeTruthy();
@@ -25,7 +28,11 @@ test("EAA chat streams once, survives reload, and exposes runtime controls", asy
   await page.getByRole("button", { name: "Main Agent", exact: true }).click();
   await expect(page.getByText("Images (0)", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Expand sessions and tools" }).click();
-  await page.getByRole("button", { name: "Launch reviewer", exact: true }).click();
+  await page.getByRole("textbox", { name: "Subagent task" }).fill("Say Reviewer finished");
+  await expect(page.getByRole("button", { name: "Launch subagent", exact: true })).toBeDisabled();
+  await page.getByRole("combobox", { name: "Subagent", exact: true }).selectOption("reviewer");
+  await expect(page.getByRole("textbox", { name: "Workflow task" })).toHaveValue("Three example measurements");
+  await page.getByRole("button", { name: "Launch subagent", exact: true }).click();
   await expect.poll(async () => (await (await request.get("/api/state")).json()).conversations.some((c: any) => c.kind === "subagent" && c.messages.length), { timeout: 60000 }).toBeTruthy();
   await page.getByRole("button", { name: "Open terminal", exact: true }).click();
   await page.getByRole("button", { name: "Collapse sessions and tools" }).click();
@@ -116,4 +123,36 @@ test("sessions panel floats, resizes, and dismisses outside without shifting the
   await page.screenshot({ path: "/tmp/eaa-floating-panel-mobile.png" });
   await page.mouse.click(385, 830);
   await expect(panel).toBeHidden();
+});
+
+
+test("subagent section lists agents and handles an empty catalog", async ({ page }) => {
+  let agents = [{ name: "inspector", description: "Inspect data" }, { name: "writer", description: "Write a report" }];
+  await page.route("**/api/agents", route => route.fulfill({ json: { agents } }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Expand sessions and tools" }).click();
+  const section = page.getByRole("region", { name: "Subagents", exact: true });
+  const select = section.getByRole("combobox", { name: "Subagent", exact: true });
+  await expect(select.locator("option")).toHaveText(["Select an agent", "inspector", "writer"]);
+  await select.selectOption("writer");
+  await expect(section.getByText("Write a report", { exact: true })).toBeVisible();
+  const launch = section.getByRole("button", { name: "Launch subagent" });
+  await expect(launch).toBeDisabled();
+  await section.getByRole("textbox", { name: "Subagent task" }).fill("  ");
+  await expect(launch).toBeDisabled();
+  await section.getByRole("textbox", { name: "Subagent task" }).fill("Summarize the findings");
+  await page.route("**/api/subagents", async route => {
+    if (route.request().method() !== "POST") return route.continue();
+    expect(route.request().postDataJSON()).toEqual({ agent: "writer", task: "Summarize the findings" });
+    await route.fulfill({ json: {} });
+  });
+  const sent = page.waitForRequest(request => request.url().endsWith("/api/subagents") && request.method() === "POST");
+  await launch.click();
+  await sent;
+  agents = [];
+  await page.getByRole("button", { name: "Collapse sessions and tools" }).click();
+  await page.getByRole("button", { name: "Expand sessions and tools" }).click();
+  await expect(select.locator("option")).toHaveText(["No agents available"]);
+  await expect(select).toHaveValue("");
+  await expect(launch).toBeDisabled();
 });

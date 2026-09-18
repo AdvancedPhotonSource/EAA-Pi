@@ -319,9 +319,22 @@ export class Runtime extends EventEmitter {
       this.bus.emit("subagents:rpc:v1:request", { version: 1, requestId, method, params });
     });
   }
-  async spawnChild(task: string, agent = "reviewer") {
+  async availableAgents(): Promise<{ name: string; description: string; source: string }[]> {
+    const tool = this.loader.getExtensions().extensions.map(extension => extension.tools.get("subagent")).find(Boolean);
+    if (!tool) throw new HttpError(503, "Subagent discovery is unavailable");
+    // The RPC interface has no catalog method; use the extension's read-only list action.
+    const result = await tool.definition.execute(id(), { action: "list", capabilities: true }, undefined, undefined, this.session.extensionRunner.createContext());
+    const agents = (result.details as any)?.agentCapabilities?.agents;
+    if (!Array.isArray(agents)) throw new HttpError(503, "Subagent discovery failed");
+    return agents.filter(agent => agent.executable && (agent.runner.type === "pi" || agent.runner.available === true))
+      .map(({ name, description, source }) => ({ name, description, source })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  async spawnChild(task: string, agent?: string) {
     this.requireBuild();
-    const result = await this.rpc("spawn", { agent, task, cwd: this.workspace, model: `${this.config.provider}/${this.config.model}` });
+    if (!task.trim()) throw new HttpError(400, "Subagent task is required");
+    if (typeof agent !== "string" || !agent) throw new HttpError(400, "Agent selection is required");
+    if (!(await this.availableAgents()).some(item => item.name === agent)) throw new HttpError(400, "Unknown or unavailable agent");
+    const result = await this.rpc("spawn", { agent, task, cwd: this.workspace });
     const runId = result.details?.asyncId ?? result.details?.runId ?? result.details?.id;
     if (runId) { this.subagentIds.add(runId); this.startJob(`subagent:${runId}`, "subagent", "primary"); }
     return result;

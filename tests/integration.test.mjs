@@ -53,6 +53,19 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     await request("/api/workflows/run", { input: "outside root", workflow: "../toy" }, 400);
   });
 
+  await t.test("agent discovery and explicit selection", async () => {
+    const dir = join(workspace, ".pi/agents/nested");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "different-filename.md"), "---\nname: project-inspector\ndescription: Inspect the workspace\ntools: read\n---\nInspect the supplied task.\n");
+    const { agents } = await request("/api/agents");
+    assert.ok(agents.some(agent => agent.name === "project-inspector" && agent.description === "Inspect the workspace"));
+    assert.equal(agents.filter(agent => agent.name === "reviewer").length, 1);
+    assert.equal(agents.find(agent => agent.name === "reviewer").source, "project");
+    await request("/api/subagents", { task: "missing selection" }, 400);
+    await request("/api/subagents", { agent: "missing", task: "unknown selection" }, 400);
+    await request("/api/subagents", { agent: "reviewer", task: "   " }, 400);
+  });
+
   await t.test("extension startup and SSE streaming", async () => {
     assert.equal(runtime.extensions.length, 8);
     
@@ -121,7 +134,7 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     await request("/api/processes", { command: "touch forbidden" }, 409);
     await request("/api/terminals", {}, 409);
     await request("/api/workflows/run", { workflow: "toy", input: "forbidden" }, 409);
-    await request("/api/subagents", { task: "forbidden" }, 409);
+    await request("/api/subagents", { agent: "reviewer", task: "forbidden" }, 409);
     await request("/api/input", { content: "!touch forbidden" }, 409);
     // Adversarial fixture emits a writer even when the advertised tools omit it.
     await prompt('fixture-tool {"name":"write","arguments":{"path":"forbidden","content":"no"}}');
@@ -138,7 +151,7 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     assert.equal(runtime.snapshot.conversations.find(c => c.id === `terminal:${terminal}`).terminal.status, "cancelled");
   });
   await t.test("pi-subagents actual child and durable transcript", async () => {
-    const result = await request("/api/subagents", { task: "Say Reviewer finished" }, 201);
+    const result = await request("/api/subagents", { agent: "project-inspector", task: "Say Reviewer finished" }, 201);
 
     await wait(() => runtime.snapshot.conversations.some(c => c.kind === "subagent" && c.messages.some(m => m.role === "assistant" && m.content.includes("Reviewer finished"))), 60000);
 
@@ -178,7 +191,7 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
   });
   await t.test("child steering, stopping, and active-session replacement refusal", async () => {
     await idle();
-    const child = await request("/api/subagents", { task: "slow response " + "a".repeat(800) }, 201);
+    const child = await request("/api/subagents", { agent: "reviewer", task: "slow response " + "a".repeat(800) }, 201);
     const runId = child.details.asyncId;
     await request("/api/sessions", { action: "new" }, 409);
     await request("/api/mode", { plan_mode: true }, 409);

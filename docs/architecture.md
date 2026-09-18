@@ -59,8 +59,9 @@ POST bodies are JSON. Errors return `{ "error": "...", "message": "..." }`. HTTP
 | `POST /api/mode` | `{plan_mode: boolean}`; requires idle |
 | `GET /api/sessions` | `{sessions, active}` |
 | `POST /api/sessions` | `{action: "new"|"resume"|"branch", session_id?}`; requires idle |
+| `GET /api/agents` | Available subagent names, descriptions, and sources |
 | `GET /api/subagents` | Upstream status/fleet/asyncSnapshot DTO |
-| `POST /api/subagents` | `{task, agent?: "reviewer"}` → upstream asynchronous launch result |
+| `POST /api/subagents` | `{task, agent}` → upstream asynchronous launch result |
 | `POST /api/subagents/:id/steer` | `{message}`; ID is the upstream async run ID |
 | `POST /api/subagents/:id/stop` | Stop the owned async run |
 | `POST /api/processes` | `{command}` → upstream process result |

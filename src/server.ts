@@ -41,6 +41,7 @@ export async function startServer(runtime: Runtime, port = runtime.config.port, 
         if (route === "/api/skill-catalog") return json({ skills: runtime.loader.getSkills().skills.map(s => ({ name: s.name, description: s.description })) });
         if (route === "/api/tool-schemas") return json({ tools: runtime.session.getAllTools().map(tool => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters }, mcp: runtime.mcpTools.has(tool.name) ? { server_id: runtime.mcpTools.get(tool.name), server_name: runtime.mcpTools.get(tool.name), status: runtime.mcpStatus?.servers?.find((s: any) => s.name === runtime.mcpTools.get(tool.name))?.status } : undefined })) });
         if (route === "/api/sessions") return json({ sessions: await runtime.sessions(), active: runtime.snapshot.session_id });
+        if (route === "/api/agents") return json({ agents: await runtime.availableAgents() });
         if (route === "/api/subagents") return json(await runtime.rpc("status"));
         if (route === "/api/workflows") {
           const rows = runtime.store.db.prepare("SELECT value FROM metadata WHERE key LIKE 'workflow:%'").all() as { value: string }[];
@@ -98,7 +99,7 @@ export async function startServer(runtime: Runtime, port = runtime.config.port, 
         if (!["new", "resume", "branch"].includes(body.action)) throw new HttpError(400, "Unknown session action");
         await runtime.replaceSession(body.action, body.session_id); return json({ ok: true, session_id: runtime.snapshot.session_id });
       }
-      if (route === "/api/subagents") return json(await runtime.spawnChild(String(body.task || ""), body.agent || "reviewer"), 201);
+      if (route === "/api/subagents") return json(await runtime.spawnChild(String(body.task || ""), body.agent), 201);
       const child = route.match(/^\/api\/subagents\/([^/]+)\/(steer|stop)$/);
       if (child) return json(await runtime.childAction(decodeURIComponent(child[1]), child[2] as "steer" | "stop", body.message));
       if (route === "/api/processes") return json(await runtime.startProcess(String(body.command || "")), 201);

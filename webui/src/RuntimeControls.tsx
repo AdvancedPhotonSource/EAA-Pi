@@ -14,12 +14,15 @@ export function RuntimeControls({ planMode, jobs, onChanged, onExpandedChange }:
   const [selected, setSelected] = useState("");
   const [workflows, setWorkflows] = useState<string[]>([]);
   const [workflow, setWorkflow] = useState("");
+  const [agents, setAgents] = useState<{ name: string; description: string }[]>([]);
+  const [agent, setAgent] = useState("");
+  const [subagentTask, setSubagentTask] = useState("");
   const [task, setTask] = useState("");
   const [runs, setRuns] = useState<{ id: string; status: string; run_dir?: string }[]>([]);
   const [children, setChildren] = useState<{ id: string }[]>([]);
   const [error, setError] = useState("");
   const refresh = async () => {
-    const [sessionResponse, workflowResponse, childResponse] = await Promise.all([fetch("/api/sessions"), fetch("/api/workflows"), fetch("/api/subagents")]);
+    const [sessionResponse, workflowResponse, childResponse, agentResponse] = await Promise.all([fetch("/api/sessions"), fetch("/api/workflows"), fetch("/api/subagents"), fetch("/api/agents")]);
     const s = await sessionResponse.json();
     setSessions(s.sessions ?? []);
     setSelected(current => current || s.active);
@@ -28,8 +31,16 @@ export function RuntimeControls({ planMode, jobs, onChanged, onExpandedChange }:
     setWorkflow(current => (w.workflows ?? []).includes(current) ? current : "");
     setRuns(w.runs ?? []);
     setChildren((await childResponse.json()).asyncSnapshot?.runs ?? []);
+    const a = await agentResponse.json();
+    if (!agentResponse.ok) {
+      setAgents([]);
+      setAgent("");
+      throw new Error(a.error || "Could not load agents");
+    }
+    setAgents(a.agents);
+    setAgent(current => a.agents.some((item: { name: string }) => item.name === current) ? current : "");
   };
-  useEffect(() => { void refresh().catch(() => {}); }, [jobs.length]);
+  useEffect(() => { void refresh().catch(error => setError(String(error))); }, [jobs.length]);
   const run = async (path: string, body: unknown = {}) => {
     setError("");
     try { await post(path, body); await refresh(); onChanged(); }
@@ -61,10 +72,9 @@ export function RuntimeControls({ planMode, jobs, onChanged, onExpandedChange }:
           <option value="">{workflows.length ? "Select a workflow" : "No workflows available"}</option>
           {workflows.map(name => <option key={name} value={name}>{name}</option>)}
         </select></label>
-        <label>Task<textarea aria-label="Workflow or reviewer task" rows={3} value={task} onChange={event => setTask(event.target.value)} /></label>
+        <label>Task<textarea aria-label="Workflow task" rows={3} value={task} onChange={event => setTask(event.target.value)} /></label>
         <div className="eaa-runtime-actions">
           <button disabled={planMode || !workflow} onClick={() => void run("/api/workflows/run", { input: task, workflow })}><Play size={14} />Run workflow</button>
-          <button disabled={planMode} onClick={() => void run("/api/subagents", { task })}><Users size={14} />Launch reviewer</button>
           <button disabled={planMode} onClick={() => void run("/api/terminals")}><Terminal size={14} />Open terminal</button>
         </div>
       </section>
@@ -76,9 +86,16 @@ export function RuntimeControls({ planMode, jobs, onChanged, onExpandedChange }:
           {r.run_dir && r.status !== "running" && <button disabled={planMode} onClick={() => void run("/api/workflows/resume", { id: r.id })}><RotateCcw size={13} />Resume workflow</button>}
         </div>)}
       </section>
-      {!!children.length && <section className="eaa-runtime-section"><h2>Reviewers</h2>
-        {children.map(c => <div className="eaa-runtime-row" key={c.id}><span>Child {c.id.slice(0, 8)}</span><div className="eaa-runtime-actions"><button disabled={planMode} onClick={() => void run(`/api/subagents/${encodeURIComponent(c.id)}/steer`, { message: task })}>Send task</button><button onClick={() => void run(`/api/subagents/${encodeURIComponent(c.id)}/stop`)}>Stop child</button></div></div>)}
-      </section>}
+      <section className="eaa-runtime-section" aria-label="Subagents"><h2>Subagents</h2>
+        <label>Agent<select aria-label="Subagent" value={agent} onChange={event => setAgent(event.target.value)}>
+          <option value="">{agents.length ? "Select an agent" : "No agents available"}</option>
+          {agents.map(item => <option key={item.name} value={item.name}>{item.name}</option>)}
+        </select></label>
+        {agent && <p className="eaa-runtime-empty">{agents.find(item => item.name === agent)?.description}</p>}
+        <label>Task<textarea aria-label="Subagent task" rows={3} value={subagentTask} onChange={event => setSubagentTask(event.target.value)} /></label>
+        <button disabled={planMode || !agent || !subagentTask.trim()} onClick={() => void run("/api/subagents", { agent, task: subagentTask })}><Users size={14} />Launch subagent</button>
+        {children.map(c => <div className="eaa-runtime-row" key={c.id}><span>Child {c.id.slice(0, 8)}</span><div className="eaa-runtime-actions"><button disabled={planMode || !subagentTask.trim()} onClick={() => void run(`/api/subagents/${encodeURIComponent(c.id)}/steer`, { message: subagentTask })}>Send task</button><button onClick={() => void run(`/api/subagents/${encodeURIComponent(c.id)}/stop`)}>Stop child</button></div></div>)}
+      </section>
       {jobs.some(j => !j.job_id.startsWith("tool:")) && <section className="eaa-runtime-section"><h2>Active jobs</h2>
         {jobs.filter(j => !j.job_id.startsWith("tool:")).map(j => <div className="eaa-runtime-row" key={j.job_id}><span>{j.tool_name}: {j.status}</span><button onClick={() => void run(`/api/jobs/${encodeURIComponent(j.job_id)}/cancel`)}>Stop</button></div>)}
       </section>}
