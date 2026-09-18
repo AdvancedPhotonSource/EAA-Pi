@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
-import { realpathSync, writeFileSync, readFileSync, openSync, closeSync, constants } from "node:fs";
-import { join, extname } from "node:path";
+import { realpathSync, writeFileSync, openSync, closeSync, constants } from "node:fs";
+import { join } from "node:path";
 import { dataDir } from "./config.js";
 
 export interface Message {
@@ -80,13 +80,6 @@ export class Store {
     try { writeFileSync(file, data); } finally { closeSync(file); }
     this.db.prepare("INSERT OR REPLACE INTO artifacts VALUES (?,?,?)").run(id, path, mime);
     return path;
-  }
-  artifactFile(path: string): string {
-    const absolute = realpathSync(path);
-    const root = realpathSync(this.workspace) + "/";
-    if (!absolute.startsWith(root) || absolute.includes("/.eaa-pi/agent/") || absolute.includes("/.pi-experiment-ops/agent/") || absolute.includes("/.pi/")) throw new Error("Image is outside the workspace artifact scope");
-    const mime = ({ ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp" } as Record<string, string>)[extname(absolute).toLowerCase()];
-    return this.artifact(readFileSync(absolute), mime);
   }
   resolveArtifact(path: string): { path: string; mime: string } | undefined {
     const row = this.db.prepare("SELECT path,mime FROM artifacts WHERE path=? OR id=?").get(path, path) as { path: string; mime: string } | undefined;

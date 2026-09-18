@@ -44,7 +44,7 @@ export async function startServer(runtime: Runtime, port = runtime.config.port, 
         if (route === "/api/subagents") return json(await runtime.rpc("status"));
         if (route === "/api/workflows") {
           const rows = runtime.store.db.prepare("SELECT value FROM metadata WHERE key LIKE 'workflow:%'").all() as { value: string }[];
-          return json({ runs: rows.map(row => JSON.parse(row.value)).filter(run => run.sessionId === runtime.snapshot.session_id) });
+          return json({ workflows: workflows.list(), runs: rows.map(row => JSON.parse(row.value)).filter(run => run.sessionId === runtime.snapshot.session_id) });
         }
         if (route === "/api/image") {
           const artifact = runtime.store.resolveArtifact(url.searchParams.get("path") || "");
@@ -105,8 +105,8 @@ export async function startServer(runtime: Runtime, port = runtime.config.port, 
       if (route === "/api/terminals") return json(await runtime.openTerminal(body.command), 201);
       const terminal = route.match(/^\/api\/terminals\/([^/]+)\/input$/);
       if (terminal) return json(await runtime.terminal({ sessionId: decodeURIComponent(terminal[1]), input: String(body.input ?? ""), submit: body.submit !== false }));
-      if (route === "/api/workflows/run") return json(await workflows.run(String(body.input || ""), body.workflow || "toy"), 201);
-      if (route === "/api/workflows/resume") return json(await workflows.run("", "toy", body.id), 201);
+      if (route === "/api/workflows/run") return json(await workflows.run(String(body.input || ""), body.workflow), 201);
+      if (route === "/api/workflows/resume") return json(await workflows.run("", undefined, body.id), 201);
       const job = route.match(/^\/api\/jobs\/([^/]+)\/cancel$/);
       if (job) { const jobId = decodeURIComponent(job[1]); return json(jobId.startsWith("workflow:") ? workflows.cancel(jobId.slice(9)) : await runtime.cancelJob(jobId)); }
       throw new HttpError(404, "Unknown API route");

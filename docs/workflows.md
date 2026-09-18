@@ -10,13 +10,15 @@ The application uses unchanged pi-graph as its only DAG runner. The installed `p
 
 ## Run and resume
 
-Use **Sessions & tools → Run toy workflow**, or:
+Use **Sessions & tools → select toy → enter a task → Run workflow**, or:
 
 ```bash
 curl -sS http://127.0.0.1:8010/api/workflows/run \
-  -H 'Content-Type: application/json' -d '{"input":"Three example measurements"}'
+  -H 'Content-Type: application/json' -d '{"workflow":"toy","input":"Three example measurements"}'
 curl -sS http://127.0.0.1:8010/api/workflows
 ```
+
+The demo command configures the example to use its local fixture model. For other providers, set the model in `workflows/toy/steps.yaml` before launching. Generated files stay in the reported run directory.
 
 The first response contains the host run ID. The list contains status, the copied definition, pi-graph's durable run directory and summary. Workflows run asynchronously. Stop them through the Jobs control or `POST /api/jobs/workflow%3ARUN_ID/cancel`.
 
@@ -33,7 +35,7 @@ To recover the deliberate command failure, create an empty file named `allow-ren
 
 ## Author a workflow
 
-Create `workflows/NAME/steps.yaml` and any helper files, then post `{"workflow":"NAME","input":"..."}` to `/api/workflows/run`. The adapter accepts directories below the configured workspace workflow root, copies them into a per-run definition directory, and launches `piw`. Only the shipped `toy` model placeholder is replaced with `eaa-pi.json`'s provider/model; specify models explicitly in your own workflows. Relative command paths resolve beside the copied definition. Do not put run output inside source inputs.
+Create `workflows/NAME/steps.yaml` and any helper files, then post `{"workflow":"NAME","input":"..."}` to `/api/workflows/run`. The adapter accepts directories below the configured workspace workflow root, copies them into a per-run definition directory, and launches `piw`. Workflow definitions are copied unchanged; configure models in `steps.yaml`. Relative command paths resolve beside the copied definition. Do not put run output inside source inputs.
 
 Use pi-graph's documented `needs`, `agent`, `cmd`, `gate`, `timeout`, and output substitutions. Gate structured output before side effects, bound execution, and make external effects idempotent. Resume semantics, cache rules, failure propagation, and scheduling belong to pi-graph; the adapter observes and launches it. See the [pinned graph repository](https://github.com/ali-abassi/pi-graph/tree/4db15464e2268755aafcb52e32341bd536dc56dd).
 

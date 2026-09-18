@@ -1661,14 +1661,61 @@ body.eaa-resizing-rows * {
   }
 }
 :root { --eaa-runtime-border: #cbd5e1; }
-.eaa-runtime-controls { position: relative; font-size: 13px; }
-.eaa-runtime-controls summary { cursor: pointer; padding: 8px; }
-.eaa-runtime-popover { position: absolute; right: 0; top: 36px; z-index: 50; width: min(520px, 85vw); max-height: 70vh; overflow: auto; background: white; border: 1px solid var(--eaa-runtime-border); border-radius: 10px; padding: 16px; box-shadow: 0 10px 30px #0002; }
-.eaa-runtime-popover label { display: grid; gap: 5px; margin-bottom: 10px; }
-.eaa-runtime-popover input, .eaa-runtime-popover select, .eaa-terminal-input input { padding: 8px; border: 1px solid var(--eaa-runtime-border); border-radius: 5px; min-width: 0; }
-.eaa-runtime-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
-.eaa-runtime-popover button, .eaa-terminal-input button { padding: 7px; border: 1px solid var(--eaa-runtime-border); border-radius: 5px; background: #f8fafc; cursor: pointer; }
-.eaa-runtime-popover button:disabled, .eaa-terminal-input button:disabled { opacity: .45; cursor: default; }
-.eaa-runtime-popover [role=alert], .eaa-terminal-input [role=alert] { color: #a22626; }
+/* Floating sessions and tools panel */
+.eaa-nav { position: relative; }
+.eaa-nav .eaa-brand { padding-right: 38px; }
+.eaa-runtime-toggle { position: absolute; top: 24px; right: 14px; width: 32px; height: 32px; padding: 0; background: transparent; border: 0; border-radius: 6px; color: #c9d5e6; cursor: pointer; }
+.eaa-runtime-toggle:hover, .eaa-runtime-toggle[aria-expanded="true"] { background: #ffffff18; color: #fff; }
+.eaa-runtime-toggle:focus-visible { outline: 2px solid #91a5ff; outline-offset: 2px; }
+.eaa-runtime-controls { position: fixed; inset: 12px auto auto 248px; margin: 0; box-sizing: border-box; width: 340px; height: 760px; min-width: min(280px, calc(100vw - 24px)); min-height: min(240px, calc(100dvh - 24px)); max-width: calc(100vw - 260px); max-height: calc(100dvh - 24px); resize: both; overflow: hidden; background: #f3f6fc; color: #0f172a; border: 1px solid #dce3ef; border-radius: 12px; box-shadow: 0 18px 60px #06183130; font-size: 13px; }
+.eaa-runtime-controls:popover-open { display: flex; flex-direction: column; }
+.eaa-runtime-controls button { color: #17243d; cursor: pointer; gap: 7px; }
+.eaa-runtime-title { padding: 22px 16px; font-size: 16px; font-weight: 750; flex-shrink: 0; }
+.eaa-runtime-content { flex: 1; padding: 0 16px 20px; overflow-y: auto; min-height: 0; }
+.eaa-runtime-section { padding: 22px 0; border-bottom: 1px solid #dce3ef; }
+.eaa-runtime-section:first-child { padding-top: 8px; }
+.eaa-runtime-section:last-child { border-bottom: 0; }
+.eaa-runtime-section h2 { font-size: 14px; margin: 0 0 18px; font-weight: 750; }
+.eaa-runtime-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 14px; }
+.eaa-runtime-heading h2 { margin: 0; }
+.eaa-runtime-content button, .eaa-terminal-input button { border: 1px solid #d7e1f0; border-radius: 6px; background: #fff; padding: 9px 8px; font-size: 12px; }
+.eaa-runtime-content button:hover:not(:disabled) { background: #eaf0ff; border-color: #a5b8ff; }
+.eaa-runtime-controls button:focus-visible, .eaa-runtime-content :is(select, textarea):focus-visible { outline: 2px solid #4668ff; outline-offset: 2px; }
+.eaa-runtime-content button:disabled, .eaa-terminal-input button:disabled { opacity: .45; cursor: default; }
+.eaa-runtime-content .eaa-runtime-primary { border-color: #6982ff; color: #2454ff; }
+.eaa-session-list { display: grid; gap: 5px; max-height: 250px; overflow-y: auto; margin-bottom: 12px; }
+.eaa-runtime-content .eaa-session-card { justify-content: flex-start; text-align: left; border-color: transparent; background: transparent; padding: 14px 10px; gap: 12px; font-size: 13px; }
+.eaa-session-card span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eaa-runtime-controls svg { flex-shrink: 0; }
+.eaa-runtime-content .eaa-session-card.is-selected { background: #e0eaff; color: #214ce5; }
+.eaa-runtime-content label { display: grid; gap: 7px; margin-bottom: 16px; font-size: 12px; }
+.eaa-runtime-content select, .eaa-runtime-content textarea, .eaa-terminal-input input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid #d7e1f0; border-radius: 6px; background: #fff; color: #17243d; font: inherit; padding: 10px; }
+.eaa-runtime-content textarea { resize: vertical; line-height: 1.5; }
+.eaa-runtime-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.eaa-runtime-empty { color: #7b8aa4; font-size: 12px; line-height: 1.6; margin: 10px 0; }
+.eaa-runtime-content .eaa-runtime-refresh { background: transparent; border: 0; color: #315aff; }
+.eaa-run-card { padding: 12px 0; }
+.eaa-run-summary { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+.eaa-run-summary > span:first-of-type { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.eaa-run-status { font-size: 10px; font-weight: 650; padding: 5px 8px; border-radius: 7px; background: #e8edf5; color: #58677e; text-transform: capitalize; }
+.eaa-run-status.status-completed { color: #008852; background: #d5f5e5; }
+.eaa-run-status.status-running { color: #2454ff; background: #dfe9ff; }
+.eaa-run-status.status-failed { color: #c63333; background: #ffe5e5; }
+.eaa-runtime-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; overflow-wrap: anywhere; }
+.eaa-runtime-content [role=alert], .eaa-terminal-input [role=alert] { color: #a22626; }
+.eaa-workspace { container-type: inline-size; }
+@container (max-width: 740px) {
+  .eaa-main { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+  .eaa-chat { min-height: 540px; }
+  .eaa-panel-resizer-vertical { display: none; }
+  .eaa-sidebar { min-height: 420px; }
+}
+@media (min-width: 981px) {
+  .eaa-nav { flex-basis: 240px; padding: 24px 14px; }
+}
+@media (max-width: 980px) {
+  .eaa-runtime-toggle { top: 14px; }
+  .eaa-runtime-controls { top: 54px; left: 12px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 66px); }
+}
 .eaa-terminal-input { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; }
 .eaa-terminal-input input { flex: 1; }

@@ -43,7 +43,7 @@ try {
   const response = await fetch(url + "/api/input", { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"content":"hello packaged application"}' });
   assert.equal(response.status, 201);
   await until(async () => (await (await fetch(url + "/api/state")).json()).conversations[0].messages.some(m => m.content === "Demo reply: hello packaged application"));
-  const workflow = await (await fetch(url + "/api/workflows/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"input":"packaged toy"}' })).json();
+  const workflow = await (await fetch(url + "/api/workflows/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"workflow":"toy","input":"packaged toy"}' })).json();
   await until(async () => (await (await fetch(url + "/api/workflows")).json()).runs.some(run => run.id === workflow.id && run.status === "completed"));
   console.log(`Packaged install, idempotent installer, chat, frontend, eight extensions, and pi-graph passed in ${target}`);
 } finally {

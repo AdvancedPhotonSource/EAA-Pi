@@ -1,10 +1,10 @@
 import { piwCli } from "pi-experiment-ops";
 import { spawn, type ChildProcess } from "node:child_process";
-import { cpSync, existsSync, readFileSync, writeFileSync, realpathSync, mkdirSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, realpathSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { join, basename, dirname } from "node:path";
 import { dataDir } from "./config.js";
 import { HttpError, type Runtime } from "./runtime.js";
-import { id, timestamp } from "./store.js";
+import { id } from "./store.js";
 
 export class Workflows {
   private processes = new Map<string, ChildProcess>();
@@ -20,7 +20,17 @@ export class Workflows {
       runtime.store.set(row.key, JSON.stringify(record));
     }
   }
-  async run(input: string, workflow = "toy", resume?: string) {
+  list(): string[] {
+    const root = join(this.runtime.workspace, "workflows");
+    if (!existsSync(root)) return [];
+    const resolvedRoot = realpathSync(root);
+    return readdirSync(root, { withFileTypes: true }).filter(entry => {
+      if (!entry.isDirectory()) return false;
+      const definition = join(root, entry.name, "steps.yaml");
+      return existsSync(definition) && statSync(definition).isFile() && realpathSync(definition).startsWith(resolvedRoot + "/");
+    }).map(entry => entry.name).sort();
+  }
+  async run(input: string, workflow?: string, resume?: string) {
     this.runtime.requireBuild();
     if (!input.trim() && !resume) throw new HttpError(400, "Workflow input is required");
     const workflowId = id();
@@ -37,17 +47,14 @@ export class Workflows {
       if (!record.run_dir) throw new HttpError(409, "This run has no resumable runner state");
       args = ["resume", definition, basename(record.run_dir), "--json"];
     } else {
+      if (typeof workflow !== "string" || !workflow) throw new HttpError(400, "Workflow selection is required");
+      if (!this.list().includes(workflow)) throw new HttpError(400, "Unknown workflow");
       const source = realpathSync(join(this.runtime.workspace, "workflows", workflow));
       if (!source.startsWith(realpathSync(join(this.runtime.workspace, "workflows")) + "/")) throw new HttpError(400, "Workflow is outside configured roots");
       const target = join(definitions, workflowId);
       mkdirSync(definitions, { recursive: true });
       cpSync(source, target, { recursive: true, filter: file => !file.includes("/runs/") && !file.endsWith("/runs") });
       definition = join(target, "steps.yaml");
-      // The shipped toy has a model placeholder; user workflows retain their own model choices.
-      if (workflow === "toy") {
-        const model = `${this.runtime.config.provider}/${this.runtime.config.model}`;
-        writeFileSync(definition, readFileSync(definition, "utf8").replace(/^model:.*$/m, `model: ${JSON.stringify(model)}`));
-      }
       args = ["run", definition, "--input", input, "--json", "--no-cache"];
     }
     const key = `workflow:${workflowId}`;
@@ -71,8 +78,6 @@ export class Workflows {
       this.runtime.store.set(key, JSON.stringify(record));
       this.runtime.finishJob(key, record.status, JSON.stringify({ ...result, error: result.error || stderr || undefined }));
       this.runtime.log("workflow", `${workflowId}: ${record.status}`);
-      const image = result.run_dir && join(result.run_dir, "chart.png");
-      if (image && existsSync(image)) this.runtime.message({ id: key, role: "assistant", content: `Toy workflow ${record.status}.`, images: [this.runtime.store.artifactFile(image)], timestamp: timestamp() });
     });
     return record;
   }

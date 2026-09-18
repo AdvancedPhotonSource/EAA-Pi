@@ -9,6 +9,7 @@ import {
   Maximize2,
   MessageCircle,
   Paperclip,
+  PanelLeft,
   RefreshCw,
   Send,
   Settings,
@@ -779,6 +780,7 @@ function App() {
   const [logs, setLogs] = useState<RuntimeLogEntry[]>([]);
   const [toolExecutionQueue, setToolExecutionQueue] = useState<ToolExecutionQueueEntry[]>([]);
   const [messageQueue, setMessageQueue] = useState<MessageQueueEntry[]>([]);
+  const [runtimeExpanded, setRuntimeExpanded] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [mathJaxReady, setMathJaxReady] = useState(Boolean(window.MathJax?.typesetPromise));
@@ -1659,6 +1661,9 @@ function App() {
         </div>
       ) : null}
       <aside className="eaa-nav" aria-label="Primary navigation">
+        <button className="eaa-runtime-toggle" aria-label={runtimeExpanded ? "Collapse sessions and tools" : "Expand sessions and tools"} aria-expanded={runtimeExpanded} aria-controls="runtime-panel" popoverTarget="runtime-panel" title="Sessions & tools">
+          <PanelLeft size={22} aria-hidden="true" />
+        </button>
         <div className="eaa-brand">
           <div className="eaa-brand-mark">
             <Bot size={26} aria-hidden="true" />
@@ -1690,11 +1695,11 @@ function App() {
           </div>
         </div>
       </aside>
+      <RuntimeControls onExpandedChange={setRuntimeExpanded} planMode={planMode} jobs={toolExecutionQueue} onChanged={() => void loadState()} />
       <div className="eaa-workspace">
         <header className="eaa-header">
           <div className="eaa-title">{uiTitle || config.title}</div>
           <div className="eaa-header-actions">
-            <RuntimeControls planMode={planMode} jobs={toolExecutionQueue} onChanged={() => void loadState()} />
             <button className="eaa-header-button" type="button" onClick={() => setHelpOpen(true)}>
               <HelpCircle size={17} aria-hidden="true" />
               <span>Help</span>

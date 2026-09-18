@@ -21,7 +21,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 The shortcut works from any directory. If needed, add the `export` line to `~/.bashrc` to keep it available in new terminals. See [command setup](docs/installation.md#enable-the-eaa-pi-command) for tarball installations and removing the link.
 
-Open **http://127.0.0.1:8010**. The demo uses a local deterministic model endpoint and simulated MCP instrument; no provider credentials are required. Try `hello`, `request approval`, `run background job`, `review in background`, or `open terminal`. Use **Sessions & tools → Run toy workflow** to exercise generator → reviewer → image creation.
+Open **http://127.0.0.1:8010**. The demo uses a local deterministic model endpoint and simulated MCP instrument; no provider credentials are required. Try `hello`, `request approval`, `run background job`, `review in background`, or `open terminal`. Use **Sessions & tools → select toy → enter a task → Run workflow** to exercise generator → reviewer → image creation.
 
 For a real provider, initialize an EAA workspace:
 

@@ -37,7 +37,7 @@ Session replacement disposes the current runtime, emits shutdown, reloads resour
 
 `GET /api/events` uses Server-Sent Events. Every connection begins with `snapshot`, including reconnects with Last-Event-ID. Subsequent events carry a monotonically increasing SSE `id` within the primary session. The authoritative snapshot resets the browser's sequence when switching sessions. Messages have stable IDs derived from Pi's role/timestamp/tool-call identity and are replaced during streaming. Terminal updates carry a separate per-terminal sequence. Completed jobs are inserted once using a SQLite unique key.
 
-Event types include `message.created`, `conversation.created`, `conversation.terminated`, `status.changed`, `queue.changed`, `terminal.output.appended`, `terminal.finished`, `approval.requested`, `interrupt.requested`, `interrupt.cleared`, and `log.created`. The toy workflow delivers images through chat messages, displayed in the browser's image panel and gallery.
+Event types include `message.created`, `conversation.created`, `conversation.terminated`, `status.changed`, `queue.changed`, `terminal.output.appended`, `terminal.finished`, `approval.requested`, `interrupt.requested`, `interrupt.cleared`, and `log.created`. Images attached to Pi messages are displayed in the browser's image panel and gallery. Workflow files remain in the runner's output directory.
 
 ## HTTP API
 
@@ -67,8 +67,8 @@ POST bodies are JSON. Errors return `{ "error": "...", "message": "..." }`. HTTP
 | `POST /api/terminals` | `{command?: "bash --noprofile --norc"}` → upstream `details.sessionId` |
 | `POST /api/terminals/:id/input` | `{input, submit?: true}` |
 | `POST /api/jobs/:id/cancel` | URL-encoded `process:…`, `terminal:…`, `subagent:…`, or `workflow:…` ID |
-| `GET /api/workflows` | Host workflow records for the active primary session |
-| `POST /api/workflows/run` | `{input, workflow?: "toy"}` |
+| `GET /api/workflows` | Available workflow names and host workflow records for the active primary session |
+| `POST /api/workflows/run` | `{input, workflow}` |
 | `POST /api/workflows/resume` | `{id: hostRunId}` |
 
 Plan mode denies mutating launch/steer/input endpoints as well as model tool calls. Session replacement rejects active work and lists it in the error. Primary prompt interruption, job cancellation, session history restoration, and workflow resume are distinct operations.

@@ -57,7 +57,7 @@ test("non-root filesystem boundary contains every execution path", { timeout: 18
     }
     assert.equal(readFileSync("/fixtures/sentinel", "utf8"), "unchanged\n");
     assert.equal((await fetch(app.url + "/api/image?path=../../fixtures/sentinel")).status, 404);
-    assert.throws(() => runtime.store.artifactFile("/workspace/symlink"));
+    assert.equal((await fetch(app.url + "/api/image?path=/workspace/symlink")).status, 404);
     assert.throws(() => writeFileSync("/opt/eaa-pi/escape", "escaped"));
   } finally { await app.close(); await model.close(); }
 });

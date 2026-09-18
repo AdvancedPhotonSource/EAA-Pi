@@ -83,14 +83,14 @@ export class Runtime extends EventEmitter {
       noExtensions: true, noSkills: true, noContextFiles: true, noPromptTemplates: true, noThemes: true,
       additionalExtensionPaths: paths.extensions,
       additionalSkillPaths: paths.skills,
-      systemPrompt: "You are EAA, an assistant powered by Pi. Use the available tools for the user's work. Delegate with subagent when useful. Use process for background scripts and interactive_shell in background dispatch mode for persistent terminals. Keep responses concise. The installed workflow is a toy demonstration, not an instrument-control workflow.",
+      systemPrompt: "You are EAA, an assistant powered by Pi. Use the available tools for the user's work. Delegate with subagent when useful. Use process for background scripts and interactive_shell in background dispatch mode for persistent terminals. Keep responses concise.",
     });
     await this.loader.reload();
     const loaded = this.loader.getExtensions();
     if (loaded.errors.length) throw new Error(loaded.errors.map(e => `${e.path}: ${e.error}`).join("\n"));
     this.extensions = loaded.extensions.map(e => e.path);
     const modelRuntime = await ModelRuntime.create({ authPath: join(agentDir(this.workspace), "auth.json"), modelsPath: join(agentDir(this.workspace), "models.json"), allowModelNetwork: false });
-    const model = modelRuntime.getModel(this.config.provider || "eaa-demo", this.config.model || "toy");
+    const model = modelRuntime.getModel(this.config.provider, this.config.model);
     const created = await createAgentSession({
       cwd: this.workspace, agentDir: agentDir(this.workspace), resourceLoader: this.loader, settingsManager: this.settings,
       sessionManager: manager, modelRuntime, model: model as any, thinkingLevel: "off",

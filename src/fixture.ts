@@ -1,5 +1,14 @@
 import { createServer, type IncomingMessage } from "node:http";
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+export function configureDemoWorkflow(workspace: string) {
+  const definition = join(workspace, "workflows/toy/steps.yaml");
+  if (!existsSync(definition)) return;
+  const source = readFileSync(definition, "utf8");
+  if (/^model: local-test\/toy$/m.test(source)) writeFileSync(definition, source.replace(/^model: local-test\/toy$/m, "model: eaa-demo/toy"));
+}
 
 export async function jsonBody(request: IncomingMessage, limit = 12 * 1024 * 1024): Promise<any> {
   const parts: Buffer[] = [];

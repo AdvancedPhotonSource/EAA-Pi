@@ -7,7 +7,7 @@ import { SessionManager } from "pi-experiment-ops/sdk";
 import { spawn } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { initialize, configureEnvironment, writeJson, agentDir, sessionDir, PACKAGE_ROOT } from "../dist/server/config.js";
-import { startModelFixture, startInstrumentFixture, tinyPng } from "../dist/server/fixture.js";
+import { startModelFixture, startInstrumentFixture, tinyPng, configureDemoWorkflow } from "../dist/server/fixture.js";
 
 const wait = async (fn, timeout = 20000) => {
   const deadline = Date.now() + timeout;
@@ -19,6 +19,7 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
   const cwd = process.cwd();
   const workspace = initialize(mkdtempSync(join(tmpdir(), "eaa-pi-integration-")));
   configureEnvironment(workspace);
+  configureDemoWorkflow(workspace);
   const model = await startModelFixture();
   const instrument = await startInstrumentFixture();
   writeJson(join(workspace, "eaa-pi.json"), { host: "127.0.0.1", port: 0, ...(providerSource === "legacy" ? { provider: "eaa-demo", model: "toy" } : {}) });
@@ -44,6 +45,13 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
   const idle = () => wait(() => !runtime.busy && !runtime.session.isStreaming);
   const prompt = async content => { await request("/api/input", { content }, 201); await idle(); };
   t.after(async () => { await app.close(); await model.close(); await instrument.close(); process.chdir(cwd); });
+
+  await t.test("workflow catalog and explicit selection", async () => {
+    assert.deepEqual((await request("/api/workflows")).workflows, ["toy"]);
+    await request("/api/workflows/run", { input: "missing selection" }, 400);
+    await request("/api/workflows/run", { input: "unknown selection", workflow: "missing" }, 400);
+    await request("/api/workflows/run", { input: "outside root", workflow: "../toy" }, 400);
+  });
 
   await t.test("extension startup and SSE streaming", async () => {
     assert.equal(runtime.extensions.length, 8);
@@ -87,7 +95,7 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     assert.equal((await fetch(app.url + "/api/image?path=/etc/passwd")).status, 404);
     assert.equal((await fetch(app.url + "/api/image?path=../../etc/passwd")).status, 404);
     const outside = join(workspace, "outside.png"); symlinkSync("/etc/passwd", outside);
-    assert.throws(() => runtime.store.artifactFile(outside));
+    assert.equal((await fetch(app.url + "/api/image?path=" + encodeURIComponent(outside))).status, 404);
   });
   await t.test("approval round trip and interrupt", async () => {
     await request("/api/input", { content: "request approval" }, 201);
@@ -112,7 +120,7 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     for (const name of runtime.session.getActiveToolNames()) assert.ok(["read", "grep", "find", "ls", "pi_modes_plan_complete"].includes(name), name);
     await request("/api/processes", { command: "touch forbidden" }, 409);
     await request("/api/terminals", {}, 409);
-    await request("/api/workflows/run", { input: "forbidden" }, 409);
+    await request("/api/workflows/run", { workflow: "toy", input: "forbidden" }, 409);
     await request("/api/subagents", { task: "forbidden" }, 409);
     await request("/api/input", { content: "!touch forbidden" }, 409);
     // Adversarial fixture emits a writer even when the advertised tools omit it.
@@ -136,20 +144,23 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
 
   });
   await t.test("pi-graph actual generation, review, rendering and rejection", async () => {
-    const run = await request("/api/workflows/run", { input: "Three toy measurements" }, 201);
+    const run = await request("/api/workflows/run", { workflow: "toy", input: "Three toy measurements" }, 201);
     await wait(() => runtime.snapshot.conversations.some(c => c.kind === "workflow" && c.status === "running"), 60000);
     const record = await wait(() => { const r = JSON.parse(runtime.store.get(`workflow:${run.id}`)); return r.status !== "running" && r; }, 60000);
     assert.equal(record.status, "completed", JSON.stringify(record));
+    assert.equal(readFileSync(record.definition, "utf8"), readFileSync(join(workspace, "workflows/toy/steps.yaml"), "utf8"));
+    assert.ok(existsSync(join(record.run_dir, "chart.png")));
+    assert.equal(runtime.snapshot.conversations.find(c => c.id === "primary").messages.some(m => m.id === `workflow:${run.id}`), false);
     assert.equal(JSON.parse(readFileSync(join(record.run_dir, "receipt.json"), "utf8")).count, 1);
     assert.ok(runtime.snapshot.conversations.some(c => c.kind === "workflow" && c.messages.some(m => m.role === "assistant")));
-    const rejected = await request("/api/workflows/run", { input: "reject-review" }, 201);
+    const rejected = await request("/api/workflows/run", { workflow: "toy", input: "reject-review" }, 201);
     const rejection = await wait(() => { const r = JSON.parse(runtime.store.get(`workflow:${rejected.id}`)); return r.status !== "running" && r; }, 60000);
     assert.equal(rejection.status, "failed");
     assert.equal(existsSync(join(rejection.run_dir, "receipt.json")), false);
   });
   await t.test("workflow failure, resume, receipt idempotency, and cancellation", async () => {
     const settled = run => wait(() => { const record = JSON.parse(runtime.store.get(`workflow:${run.id}`)); return record.status !== "running" && record; }, 60000);
-    const failed = await settled(await request("/api/workflows/run", { input: "fail-command" }, 201));
+    const failed = await settled(await request("/api/workflows/run", { workflow: "toy", input: "fail-command" }, 201));
     assert.equal(failed.status, "failed");
     writeFileSync(join(failed.run_dir, "allow-render"), "approved test retry");
     const count = model.requests.length;
@@ -160,7 +171,7 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     const again = await settled(await request("/api/workflows/resume", { id: resumed.id }, 201));
     assert.equal(again.status, "completed");
     assert.equal(readFileSync(join(again.run_dir, "receipt.json"), "utf8"), receipt);
-    const slow = await request("/api/workflows/run", { input: "slow-workflow" }, 201);
+    const slow = await request("/api/workflows/run", { workflow: "toy", input: "slow-workflow" }, 201);
     await wait(() => model.requests.some(r => JSON.stringify(r.messages).includes("slow-workflow")));
     await request(`/api/jobs/${encodeURIComponent(`workflow:${slow.id}`)}/cancel`, {});
     assert.equal((await settled(slow)).status, "cancelled");

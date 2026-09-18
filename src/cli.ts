@@ -3,7 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { initialize, configureEnvironment, loadConfig, writeJson, agentDir, migrateLegacySessions, PACKAGE_ROOT, adapterResources } from "./config.js";
-import { startModelFixture, startInstrumentFixture } from "./fixture.js";
+import { startModelFixture, startInstrumentFixture, configureDemoWorkflow } from "./fixture.js";
 
 const args = process.argv.slice(2);
 const command = args.shift() || "serve";
@@ -51,6 +51,7 @@ if (command === "help" || command === "--help") {
     const model = command === "demo" ? await startModelFixture() : undefined;
     const instrument = command === "demo" ? await startInstrumentFixture() : undefined;
     if (model && instrument) {
+      configureDemoWorkflow(workspace);
       const settingsPath = join(agentDir(workspace), "settings.json");
       writeJson(settingsPath, { ...JSON.parse(readFileSync(settingsPath, "utf8")), defaultProvider: "eaa-demo", defaultModel: "toy" });
       const previousModels = existsSync(join(agentDir(workspace), "models.json")) ? JSON.parse(readFileSync(join(agentDir(workspace), "models.json"), "utf8")) : {};
