@@ -16,7 +16,7 @@ Start from any directory:
 
 `doctor` checks the Node version, compiled frontend, extension resources, Python imports, and Pi CLI. `serve` can start before authentication is configured; model input then reports a configuration error. First startup can take tens of seconds while Pi compiles TypeScript extensions.
 
-Configure provider/model selection in `eaa-pi.json`. To reuse an existing `pi-experiment-ops` setup, set `providerWorkspace` to its configured workspace path. For a custom endpoint managed by EAA, edit `.eaa-pi/agent/models.json` as well. See [provider configuration](configuration.md#real-provider-authentication) for both setup paths.
+Use the experiment-ops workspace directly. Provider selection, custom models, and credentials live in `.pi-experiment-ops/agent`; web host and port live in `eaa-pi.json`. See [provider configuration](configuration.md#real-provider-authentication).
 
 ### Enable the `eaa-pi` command
 
@@ -55,7 +55,7 @@ The tarball contains the compiled server/frontend, bundled community resources, 
 
 `--legacy-peer-deps` is intentional: some unchanged community manifests still declare older Pi peer package names. Pi 0.85.1's extension loader supplies compatibility aliases. The runtime uses the pinned current SDK rather than loading a second agent runtime for those peer declarations.
 
-For standalone Pi CLI/TUI use, install `pi-experiment-ops` directly. `eaa-pi` is the web application; its `pi` passthrough loads the browser adapter resources in the selected application workspace. pi-graph's runtime and Python provisioning are managed by the bundle according to its integration contract.
+`eaa-pi pi` delegates to the installed `pi-experiment-ops` launcher. pi-graph's runtime and Python provisioning are managed by the bundle according to its integration contract.
 
 ## Pi TUI and CLI passthrough
 
@@ -65,7 +65,7 @@ After [enabling the shell command](#enable-the-eaa-pi-command), launch Pi's inte
 eaa-pi pi --workspace /path/to/eaa-workspace -- --provider PROVIDER --model MODEL
 ```
 
-This starts the TUI directly without starting the HTTP server or web frontend. Stop the web server before opening the same workspace in the TUI. Pi reads provider definitions and credentials from that workspace's `.eaa-pi/agent` directory. If `providerWorkspace` is configured in `eaa-pi.json`, EAA refreshes the selected provider from that source before launching Pi. Pass `--provider` and `--model` explicitly to select the TUI model; the passthrough does not forward those selections from `eaa-pi.json` as Pi flags.
+This starts the experiment-ops TUI with its native terminal extensions and configuration in `.pi-experiment-ops/agent`. Pass `--provider` and `--model` to select the TUI model, or use experiment-ops' saved defaults. The WebUI and TUI share primary sessions; use one interface per session at a time.
 
 For a workspace configured with Argo and `gpt55`:
 
@@ -73,13 +73,13 @@ For a workspace configured with Argo and `gpt55`:
 eaa-pi pi --workspace /path/to/eaa-workspace -- --provider argo --model gpt55
 ```
 
-The EAA launcher loads its browser extension bridges. For regular terminal-only use with native terminal extensions, use the separately installed `pi-experiment-ops` command and a workspace configured for that package:
+The equivalent command when `pi-experiment-ops` is on your PATH is:
 
 ```bash
 pi-experiment-ops pi --workspace /path/to/pi-workspace
 ```
 
-That command uses `.pi-experiment-ops/agent` configuration. Sharing a workspace directory does not automatically share the two packages' provider configuration; see [provider configuration](configuration.md#real-provider-authentication).
+Both interfaces read the same provider configuration. For an existing EAA-only setup, run `eaa-pi init --workspace DIR` once to import missing native configuration; see [provider configuration](configuration.md#real-provider-authentication).
 
 Other passthrough examples:
 

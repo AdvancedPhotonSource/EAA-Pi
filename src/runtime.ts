@@ -1,12 +1,12 @@
 import { EventEmitter } from "node:events";
-import { existsSync, readdirSync, readFileSync, mkdirSync } from "node:fs";
-import { join, basename } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, basename, dirname } from "node:path";
 import { Type } from "typebox";
 import {
   createAgentSession, createEventBus, DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager, initTheme,
   type AgentSession, type EventBus, type ExtensionContext,
 } from "pi-experiment-ops/sdk";
-import { agentDir, dataDir, adapterResources, configureEnvironment, loadConfig, syncProviderConfiguration, type Config } from "./config.js";
+import { agentDir, dataDir, sessionDir, migrateLegacySessions, adapterResources, configureEnvironment, loadConfig, type Config } from "./config.js";
 import { Store, id, timestamp, type Snapshot, type Conversation, type Message } from "./store.js";
 
 export class HttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
@@ -45,14 +45,14 @@ export class Runtime extends EventEmitter {
     this.config = loadConfig(workspace);
   }
   async start(manager?: SessionManager) {
-    syncProviderConfiguration(this.workspace);
     configureEnvironment(this.workspace);
     initTheme("dark", false);
     process.chdir(this.workspace);
     this.config = loadConfig(this.workspace);
-    const sessions = join(agentDir(this.workspace), "sessions");
-    mkdirSync(sessions, { recursive: true });
-    const recent = this.store.get("activeSession");
+    const sessions = sessionDir(this.workspace);
+    migrateLegacySessions(this.workspace);
+    let recent = this.store.get("activeSession");
+    if (recent && dirname(recent) === join(dataDir(this.workspace), "agent/sessions")) recent = join(sessions, basename(recent));
     manager ??= recent && existsSync(recent) ? SessionManager.open(recent, sessions) : SessionManager.create(this.workspace, sessions, { id: this.store.get("activeSessionId") });
     this.store.set("activeSessionId", manager.getSessionId());
     process.env.EAA_PI_PARENT_SESSION = manager.getSessionId();
@@ -77,9 +77,6 @@ export class Runtime extends EventEmitter {
     this.bus = createEventBus();
     this.bindBus();
     this.settings = SettingsManager.create(this.workspace, agentDir(this.workspace));
-    this.settings.setProjectTrusted(true);
-    this.settings.setDefaultProvider(this.config.provider || "eaa-demo");
-    this.settings.setDefaultModel(this.config.model || "toy");
     const paths = adapterResources();
     this.loader = new DefaultResourceLoader({
       cwd: this.workspace, agentDir: agentDir(this.workspace), settingsManager: this.settings, eventBus: this.bus,
@@ -266,7 +263,7 @@ export class Runtime extends EventEmitter {
     // Route application lifecycle through endpoints so extensions are always rebound.
     if (/^\/(new|resume|fork|tree|reload)\b/.test(content.trim())) throw new HttpError(400, "Use the session controls for this operation");
     if (this.snapshot.plan_mode && (content.trim().startsWith("!") || content.trim().startsWith("/"))) throw new HttpError(409, "Shell and extension commands are disabled in plan mode");
-    if (!this.config.provider || !this.config.model) throw new HttpError(400, "Replace provider/model placeholders in eaa-pi.json and configure custom endpoints in .eaa-pi/agent/models.json, or launch eaa-pi demo");
+    if (!this.config.provider || !this.config.model) throw new HttpError(400, "Configure defaultProvider/defaultModel in .pi-experiment-ops/agent/settings.json and custom endpoints in .pi-experiment-ops/agent/models.json, or launch eaa-pi demo");
     const imageBlocks = images.map(path => {
       const artifact = this.store.resolveArtifact(path);
       if (!artifact) throw new HttpError(400, "Unknown image attachment");
@@ -398,7 +395,7 @@ export class Runtime extends EventEmitter {
             this.store.set(`child:${childId}`, JSON.stringify({ parent: this.snapshot.session_id, run: event.run, sessionFile: event.sessionFile }));
             if (!this.childSessions.has(childId)) {
               const saved = this.store.get(`child-session:${childId}`);
-              const manager = saved && existsSync(saved) ? SessionManager.open(saved) : SessionManager.create(this.workspace, join(agentDir(this.workspace), "children"));
+              const manager = saved && existsSync(saved) ? SessionManager.open(saved) : SessionManager.create(this.workspace, join(dataDir(this.workspace), "agent/children"));
               if (!saved) manager.appendCustomEntry("eaa-parent", { primarySession: this.snapshot.session_id, childId, workflowRun: event.run });
               this.childSessions.set(childId, manager);
               this.store.set(`child-session:${childId}`, manager.getSessionFile()!);
@@ -458,12 +455,12 @@ export class Runtime extends EventEmitter {
     if (jobId.startsWith("subagent:")) return this.childAction(jobId.slice(9), "stop");
     throw new HttpError(404, "Unknown job");
   }
-  async sessions() { return SessionManager.list(this.workspace, join(agentDir(this.workspace), "sessions")); }
+  async sessions() { return SessionManager.list(this.workspace, sessionDir(this.workspace)); }
   async replaceSession(action: string, sessionId?: string) {
     this.requireIdle();
     this.transitioning = true;
     try {
-      const directory = join(agentDir(this.workspace), "sessions");
+      const directory = sessionDir(this.workspace);
       let manager: SessionManager;
       if (action === "new") manager = SessionManager.create(this.workspace, directory);
       else {

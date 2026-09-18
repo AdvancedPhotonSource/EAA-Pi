@@ -6,17 +6,17 @@
 
 | Path | Contents |
 |---|---|
-| `eaa-pi.json` | Provider/model selection, optional `providerWorkspace`, host, port |
-| `.eaa-pi/agent/settings.json` | Pi host settings and project trust |
-| `.eaa-pi/agent/auth.json` | Pi credentials and OAuth tokens |
-| `.eaa-pi/agent/models.json` | Custom provider template with endpoint and authentication placeholders |
-| `.eaa-pi/agent/interactive-shell.json` | PTY output query interval (five seconds) |
-| `.eaa-pi/agent/modes.config.json` | Build/plan mode configuration |
-| `.eaa-pi/agent/sessions/` | Authoritative primary Pi JSONL sessions |
+| `eaa-pi.json` | Web server host and port |
+| `.pi-experiment-ops/agent/settings.json` | Pi host settings and project trust |
+| `.pi-experiment-ops/agent/auth.json` | Pi credentials and OAuth tokens |
+| `.pi-experiment-ops/agent/models.json` | Native custom provider definitions |
+| `.pi-experiment-ops/agent/interactive-shell.json` | PTY output query interval (five seconds) |
+| `.pi-experiment-ops/agent/modes.config.json` | Build/plan mode configuration |
+| `.pi-experiment-ops/agent/sessions/<encoded-workspace>/` | Authoritative primary Pi JSONL sessions shared with the experiment-ops TUI |
 | `.eaa-pi/agent/children/` | Durable Pi-format child transcript projections |
 | `.eaa-pi/children/` | Captured child JSON events, grouped by primary session |
-| `.eaa-pi/subagents/` | Upstream subagent lifecycle, control, and result artifacts |
-| `.eaa-pi/graph/` | Copied workflow definitions, run ledgers, state, receipts |
+| `.pi-experiment-ops/subagents/` | Upstream subagent lifecycle, control, and result artifacts |
+| `.pi-experiment-ops/graph/` | Copied workflow definitions, run ledgers, state, receipts |
 | `.eaa-pi/artifacts/` | Content-addressed gallery images |
 | `.eaa-pi/adapter.sqlite` | Frontend snapshots, relationships, artifact references, completion IDs |
 | `.eaa-pi/mcp-trace.jsonl` | Bounded MCP protocol metadata trace |
@@ -29,51 +29,25 @@ Global Pi extensions and original EAA configuration are not imported. The host s
 
 ## Real provider authentication
 
-`eaa-pi.json` selects a provider by name, such as `argo`, and a model ID. A custom provider's endpoint, authentication, and model definitions live in `models.json`. Choose one of the following configuration sources.
+The WebUI and TUI use the same native Pi configuration under `.pi-experiment-ops/agent`. Start eaa-pi with `--workspace` pointing to your configured experiment-ops workspace. `eaa-pi.json` contains only web server settings.
 
-### Reuse a pi-experiment-ops workspace
-
-If `pi-experiment-ops` is already configured, point EAA to that workspace in `eaa-pi.json`:
+Set `defaultProvider` and `defaultModel` in `.pi-experiment-ops/agent/settings.json`, preserving any existing settings:
 
 ```json
-{
-  "provider": "argo",
-  "model": "YOUR_CONFIGURED_MODEL_ID",
-  "providerWorkspace": "/path/to/pi-experiment-ops-workspace",
-  "host": "127.0.0.1",
-  "port": 8010
-}
+{"defaultProvider":"argo","defaultModel":"YOUR_MODEL_ID"}
 ```
 
-The source must contain `.pi-experiment-ops/agent/models.json` with the selected provider and model. `providerWorkspace` is a workspace path, not the package installation path. Relative paths resolve from the EAA workspace; `"."` selects the same workspace. Use an absolute path for a separate workspace. Omitting the field or setting it to `""` selects EAA-local configuration.
+Use `pi-experiment-ops configure` to configure a supported endpoint, or edit native `models.json` and `auth.json`. Built-in providers may use environment credentials or Pi's `/login` flow through `eaa-pi pi --workspace DIR`. OAuth credentials are saved in the shared agent directory. Restart the WebUI after changing model selection or configuration.
 
-EAA reads the selected provider's entire definition, including its available models and Argo-specific request settings, plus its credential entry from `.pi-experiment-ops/agent/auth.json` when present. It refreshes those entries in EAA's local `models.json` and `auth.json` before serving, loading a session, running `doctor`, or launching the `pi`/`piw` passthrough. This gives SDK sessions and Pi child processes the same configuration. The source files stay unchanged; settings, extensions, and sessions remain EAA-owned. Other local provider entries are preserved.
+For custom providers, specify `input: ["text", "image"]` for vision models or `input: ["text"]` for text-only models. Both interfaces use Pi's native capability handling. The sample `examples/config/models.json` can be adapted into the shared agent directory.
 
-While sharing is enabled, the source takes precedence for the selected provider. A local credential for that provider is removed if the source has no matching `auth.json` entry, allowing its `models.json` authentication settings to take effect. Export referenced credential environment variables in EAA's launch environment. OAuth token refreshes and `/login` through EAA modify the local copy; authenticate in the source workspace for credentials intended to be shared. Copies containing credentials are written with owner-only permissions.
+### Legacy EAA workspaces
 
-Restart EAA after editing the source. A missing source file, provider, or model produces a setup error rather than using an older local copy. `doctor` reports the resolved source workspace. Setting `providerWorkspace` back to `""` retains the last imported entries for local use; edit or remove them as needed. `init` preserves existing configuration and does not perform the import. Use a separate workspace for `demo`.
+Run `eaa-pi init --workspace DIR` before switching an existing EAA-only workspace to the new TUI. When native provider configuration is absent, initialization imports legacy models, credentials, and default model selection from the old EAA files. Established experiment-ops provider configuration takes precedence. Legacy files remain available, and a migration marker prevents removed credentials from being restored on later starts. The old provider/model/providerWorkspace fields are removed from the web configuration; future changes belong in the shared native files.
 
-For containers, mount the source workspace read-only and use its container path in `providerWorkspace`; see [container configuration](security.md#container-usage).
+Primary transcripts migrate when either interface starts. Browser history, artifacts, and child display projections remain under `.eaa-pi`. New workflow and subagent runs use experiment-ops' runtime directories; legacy runtime directories remain available for reference.
 
-### Configure providers directly in EAA
-
-`init` creates both configuration templates and preserves existing files on subsequent runs. In `eaa-pi.json`, replace `YOUR_PROVIDER_NAME` and `YOUR_MODEL_ID`. For a custom endpoint, edit `.eaa-pi/agent/models.json`: use the same provider name and model ID, replace `https://YOUR_ENDPOINT_HOST/v1` with the endpoint's API base URL, and replace `YOUR_API_KEY_ENV_VAR` with the name of your exported credential variable (keep the `${...}` syntax). Adjust the API protocol, model capabilities, token limits, and cost values to match your service; the template assumes OpenAI-compatible chat completions. The provider name is a label, such as `argo`, rather than a URL.
-
-For built-in providers, you can leave the unused custom provider template as generated. Unchanged provider/model placeholders count as unconfigured; `doctor` reports `providerConfigured: false`, and model input requests a configuration update.
-
-The `input` field in a custom model entry is optional. EAA defaults it to `["text", "image"]`; use `"input": ["text"]` for a text-only endpoint. Explicit values are preserved. Before loading models, EAA writes missing defaults into its local `models.json` so the web UI, `eaa-pi pi` TUI, and child agents use the same capabilities. When using `providerWorkspace`, defaults are applied to EAA's local copy and the source file stays unchanged. This default applies to EAA's launchers; standalone `pi-experiment-ops` retains Pi's own defaults.
-
-Restart EAA or its TUI after editing model capabilities. If an image read reports “Current model does not support images,” remove an unintended `"input": ["text"]` entry or change it to `["text", "image"]`, restart, and read the image again.
-
-Set `eaa-pi.json` to a provider/model available in the pinned Pi catalog:
-
-```json
-{"provider":"anthropic","model":"YOUR_MODEL_ID","host":"127.0.0.1","port":8010}
-```
-
-Use the provider's environment key when starting the server, or launch `eaa-pi pi --workspace DIR` and use Pi's `/login` flow for supported OAuth providers. Authentication created through this CLI goes into the workspace's `.eaa-pi/agent/auth.json`. The browser receives conversation content and tool results, never a provider credential configuration response. Keys inherited by a native server are available to its trusted extension/child processes.
-
-For an OpenAI-compatible endpoint, edit the generated `.eaa-pi/agent/models.json`, for example:
+For an OpenAI-compatible endpoint, edit `.pi-experiment-ops/agent/models.json`, for example:
 
 ```json
 {
@@ -88,7 +62,7 @@ For an OpenAI-compatible endpoint, edit the generated `.eaa-pi/agent/models.json
 }
 ```
 
-Use `provider: "local-provider"`, `model: "my-model"` in `eaa-pi.json`. Consult the pinned Pi [custom model documentation](https://pi.dev/docs/latest/models) for authentication value resolution and provider-specific fields. The SDK host runs offline catalog lookup; explicit network provider calls remain available.
+Use `defaultProvider: "local-provider"`, `defaultModel: "my-model"` in `.pi-experiment-ops/agent/settings.json`. Consult the pinned Pi [custom model documentation](https://pi.dev/docs/latest/models) for authentication value resolution and provider-specific fields. The SDK host runs offline catalog lookup; explicit network provider calls remain available.
 
 `demo` uses provider `eaa-demo/toy` and refreshes its ephemeral endpoint configuration each launch. Use a dedicated demo workspace. It refuses to replace a configured non-demo provider and preserves other custom provider/server entries.
 

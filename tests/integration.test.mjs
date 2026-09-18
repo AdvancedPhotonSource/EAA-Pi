@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, symlinkSync, readdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, symlinkSync, readdirSync, mkdirSync, renameSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, basename } from "node:path";
+import { SessionManager } from "pi-experiment-ops/sdk";
 import { spawn } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
-import { initialize, configureEnvironment, writeJson, agentDir, PACKAGE_ROOT } from "../dist/server/config.js";
+import { initialize, configureEnvironment, writeJson, agentDir, sessionDir, PACKAGE_ROOT } from "../dist/server/config.js";
 import { startModelFixture, startInstrumentFixture, tinyPng } from "../dist/server/fixture.js";
 
 const wait = async (fn, timeout = 20000) => {
@@ -14,20 +15,26 @@ const wait = async (fn, timeout = 20000) => {
   throw new Error("Timed out waiting for condition");
 };
 
-for (const providerSource of ["local", "shared"]) test(`real Pi and community extensions through EAA's HTTP interface (${providerSource} provider)`, { timeout: 240000 }, async t => {
+for (const providerSource of ["native", "legacy"]) test(`real Pi and community extensions through EAA's HTTP interface (${providerSource} provider)`, { timeout: 240000 }, async t => {
   const cwd = process.cwd();
   const workspace = initialize(mkdtempSync(join(tmpdir(), "eaa-pi-integration-")));
   configureEnvironment(workspace);
   const model = await startModelFixture();
   const instrument = await startInstrumentFixture();
-  writeJson(join(workspace, "eaa-pi.json"), { provider: "eaa-demo", model: "toy", providerWorkspace: providerSource === "shared" ? "ops-source" : "", host: "127.0.0.1", port: 0 });
-  const providerDirectory = providerSource === "shared" ? join(workspace, "ops-source/.pi-experiment-ops/agent") : agentDir(workspace);
-  writeJson(join(providerDirectory, "models.json"), { providers: { "eaa-demo": { baseUrl: model.url, api: "openai-completions", apiKey: "fixture", models: [{ id: "toy", reasoning: false, contextWindow: 128000, maxTokens: 4096, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }] } } });
+  writeJson(join(workspace, "eaa-pi.json"), { host: "127.0.0.1", port: 0, ...(providerSource === "legacy" ? { provider: "eaa-demo", model: "toy" } : {}) });
+  const providerDirectory = providerSource === "legacy" ? join(workspace, ".eaa-pi/agent") : agentDir(workspace);
+  writeJson(join(providerDirectory, "models.json"), { providers: { "eaa-demo": { baseUrl: model.url, api: "openai-completions", apiKey: "fixture", models: [{ id: "toy", input: ["text", "image"], reasoning: false, contextWindow: 128000, maxTokens: 4096, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }] } } });
+  if (providerSource === "native") writeJson(join(agentDir(workspace), "settings.json"), { offline: true, packages: [], theme: "dark", defaultProvider: "eaa-demo", defaultModel: "toy" });
+  initialize(workspace);
+  const settingsBefore = readFileSync(join(agentDir(workspace), "settings.json"), "utf8");
+  const modelsBefore = readFileSync(join(agentDir(workspace), "models.json"), "utf8");
   writeJson(join(workspace, ".pi/mcp.json"), { mcpServers: { toy: { url: instrument.url, directTools: true, lifecycle: "eager", approveTools: ["image"] } } });
   const { Runtime } = await import("../dist/server/runtime.js");
   const { startServer } = await import("../dist/server/server.js");
   let runtime = new Runtime(workspace);
   await runtime.start();
+  assert.equal(readFileSync(join(agentDir(workspace), "settings.json"), "utf8"), settingsBefore);
+  assert.equal(readFileSync(join(agentDir(workspace), "models.json"), "utf8"), modelsBefore);
   let app = await startServer(runtime, 0);
   const request = async (path, body, expected = 200) => {
     const response = await fetch(app.url + path, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -64,7 +71,7 @@ for (const providerSource of ["local", "shared"]) test(`real Pi and community ex
     await idle();
     assert.ok(runtime.snapshot.conversations[0].messages.some(m => m.role === "tool" && m.images?.length));
     const toolImages = model.requests.at(-1).messages.filter(m => m.role === "user" && Array.isArray(m.content)).flatMap(m => m.content).filter(block => block.type === "image_url");
-    assert.ok(toolImages.some(block => block.image_url.url === `data:image/png;base64,${tinyPng}`), "Tool image must reach the model when input is omitted");
+    assert.ok(toolImages.some(block => block.image_url.url === `data:image/png;base64,${tinyPng}`), "Tool image must reach the configured vision model");
     const upload = await request("/api/upload-image", { image_data: `data:image/png;base64,${tinyPng}` }, 201);
     await request("/api/input", { content: "Inspect image", images: [upload.file_path] }, 201);
     await idle();
@@ -201,9 +208,22 @@ for (const providerSource of ["local", "shared"]) test(`real Pi and community ex
     assert.ok(runtime.store.db.prepare("SELECT count(*) AS count FROM artifacts").get().count > 0);
     const abandonedProcess = await runtime.startProcess("sleep 30");
     const abandonedTerminal = await runtime.openTerminal();
+    const sharedFile = runtime.session.sessionFile;
     await app.close();
+    // Simulate upgrading a workspace whose active transcript is in the old store.
+    const legacyDirectory = join(workspace, ".eaa-pi/agent/sessions");
+    mkdirSync(legacyDirectory, { recursive: true });
+    const legacyFile = join(legacyDirectory, basename(sharedFile));
+    renameSync(sharedFile, legacyFile);
+    const metadata = new DatabaseSync(join(workspace, ".eaa-pi/adapter.sqlite"));
+    metadata.prepare("UPDATE metadata SET value=? WHERE key='activeSession'").run(legacyFile);
+    metadata.close();
     runtime = new Runtime(workspace); await runtime.start(); app = await startServer(runtime, 0);
     assert.equal(runtime.snapshot.session_id, before.session_id);
+    assert.equal(runtime.session.sessionFile, sharedFile);
+    assert.equal(runtime.store.get("activeSession"), sharedFile);
+    assert.equal(existsSync(legacyFile), false);
+    assert.equal(runtime.session.sessionManager.getSessionDir(), sessionDir(workspace));
     assert.equal(runtime.snapshot.conversations.find(c => c.id === `process:${abandonedProcess.process.id}`).status, "interrupted");
     assert.equal(runtime.snapshot.conversations.find(c => c.id === `terminal:${abandonedTerminal.details.sessionId}`).terminal.status, "interrupted");
     for (const child of before.conversations.filter(c => c.kind !== "primary")) assert.ok(runtime.snapshot.conversations.some(c => c.id === child.id));
@@ -213,8 +233,36 @@ for (const providerSource of ["local", "shared"]) test(`real Pi and community ex
     assert.equal(runtime.snapshot.conversations[0].messages.length, 0);
     await request("/api/sessions", { action: "resume", session_id: before.session_id });
     assert.ok(runtime.snapshot.conversations[0].messages.length > 0);
+    assert.equal(runtime.session.sessionManager.getSessionDir(), sessionDir(workspace));
+    const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+    let tuiSession;
+    try {
+      process.env.PI_CODING_AGENT_DIR = join(workspace, ".pi-experiment-ops/agent");
+      assert.ok((await SessionManager.list(workspace)).some(session => session.id === runtime.snapshot.session_id), "TUI discovers WebUI sessions");
+      tuiSession = SessionManager.forkFrom(runtime.session.sessionFile, workspace);
+      tuiSession.appendMessage({ role: "user", content: "Message added from the TUI", timestamp: Date.now() });
+    } finally { process.env.PI_CODING_AGENT_DIR = previousAgentDir; }
+    assert.ok((await request("/api/sessions")).sessions.some(session => session.id === tuiSession.getSessionId()));
+    // Resume by ID through the actual eaa-pi launcher, exercising its directory lookup.
+    await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [join(PACKAGE_ROOT, "bin/eaa-pi.mjs"), "pi", "--workspace", workspace, "--session", tuiSession.getSessionId(), "-p", "--no-approve", "hello from CLI"], { cwd: workspace, stdio: ["ignore", "pipe", "pipe"] });
+      let output = "";
+      child.stdout.on("data", chunk => { output += chunk; });
+      child.stderr.on("data", chunk => { output += chunk; });
+      const timeout = setTimeout(() => { child.kill("SIGTERM"); reject(new Error(`CLI resume timed out: ${output}`)); }, 30000);
+      child.on("error", error => { clearTimeout(timeout); reject(error); });
+      child.on("exit", code => {
+        clearTimeout(timeout);
+        if (code !== 0) reject(new Error(`CLI resume exited ${code}: ${output}`));
+        else resolve();
+      });
+    });
+    await request("/api/sessions", { action: "resume", session_id: tuiSession.getSessionId() });
+    assert.ok(runtime.snapshot.conversations[0].messages.some(message => message.content === "Message added from the TUI"));
+    assert.ok(runtime.snapshot.conversations[0].messages.some(message => message.content === "Demo reply: hello from CLI"));
     await request("/api/sessions", { action: "branch", session_id: before.session_id });
     assert.notEqual(runtime.snapshot.session_id, before.session_id);
+    assert.equal(runtime.session.sessionManager.getSessionDir(), sessionDir(workspace));
     assert.ok(runtime.snapshot.conversations[0].messages.length > 0);
     await request("/api/mcp/reconnect", { server_id: "toy" });
     await request("/api/sessions", { action: "new" });

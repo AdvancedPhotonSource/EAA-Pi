@@ -8,6 +8,7 @@
         {
           "id": "YOUR_MODEL_ID",
           "reasoning": false,
+          "input": ["text", "image"],
           "contextWindow": 128000,
           "maxTokens": 4096,
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }

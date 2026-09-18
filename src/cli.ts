@@ -1,8 +1,8 @@
-import { piwCli } from "pi-experiment-ops";
+import { initialize as initializeOps, packageRoot as opsRoot, piwCli } from "pi-experiment-ops";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { initialize, configureEnvironment, loadConfig, writeJson, agentDir, PACKAGE_ROOT, adapterResources, syncProviderConfiguration } from "./config.js";
+import { initialize, configureEnvironment, loadConfig, writeJson, agentDir, migrateLegacySessions, PACKAGE_ROOT, adapterResources } from "./config.js";
 import { startModelFixture, startInstrumentFixture } from "./fixture.js";
 
 const args = process.argv.slice(2);
@@ -15,11 +15,18 @@ function option(name: string, fallback: string): string {
 }
 if (command === "help" || command === "--help") {
   console.log("eaa-pi init|doctor|serve|demo|pi|piw [--workspace DIR] [--host HOST] [--port PORT]\nPi and piw arguments follow --. Default workspace: current directory.");
+} else if (command === "pi") {
+  const workspace = initializeOps(resolve(option("--workspace", process.cwd())));
+  migrateLegacySessions(workspace);
+  const forwarded = args[0] === "--" ? args.slice(1) : args;
+  const child = spawn(process.execPath, [join(opsRoot, "bin/pi-experiment-ops.mjs"), "pi", "--workspace", workspace, "--", ...forwarded], { cwd: workspace, stdio: "inherit" });
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => child.kill(signal));
+  child.on("error", error => { console.error(error.message); process.exitCode = 1; });
+  child.on("exit", (code, signal) => { process.exitCode = code ?? (signal === "SIGINT" ? 130 : 143); });
 } else {
   const workspace = initialize(resolve(option("--workspace", command === "demo" ? ".demo" : process.cwd())));
   configureEnvironment(workspace);
-  if (["doctor", "pi", "piw"].includes(command)) syncProviderConfiguration(workspace);
-  if (command === "init") console.log(`Initialized ${workspace}. Set provider and model in eaa-pi.json. To reuse pi-experiment-ops configuration, set providerWorkspace to its configured workspace path. Otherwise, define custom endpoints in .eaa-pi/agent/models.json (provider name, model ID, baseUrl, and API key). See docs/configuration.md. Configure .pi/mcp.json as needed, then run eaa-pi serve --workspace ${workspace}`);
+  if (command === "init") console.log(`Initialized ${workspace}. Configure provider settings in .pi-experiment-ops/agent using pi-experiment-ops configure, or edit settings.json and models.json there. See docs/configuration.md. Configure .pi/mcp.json as needed, then run eaa-pi serve --workspace ${workspace}`);
   else if (command === "doctor") {
     const paths = adapterResources();
     const checks = [
@@ -30,23 +37,22 @@ if (command === "help" || command === "--help") {
       { name: "Pi CLI", ok: spawnSync(join(PACKAGE_ROOT, "bin/shims/pi"), ["--version"], { encoding: "utf8" }).status === 0 },
     ];
     const config = loadConfig(workspace);
-    console.log(JSON.stringify({ workspace, checks, providerConfigured: Boolean(config.provider && config.model), providerWorkspace: config.providerWorkspace ? resolve(workspace, config.providerWorkspace) : null }, null, 2));
+    console.log(JSON.stringify({ workspace, checks, providerConfigured: Boolean(config.provider && config.model), agentDirectory: agentDir(workspace) }, null, 2));
     process.exitCode = checks.every(check => check.ok) ? 0 : 1;
-  } else if (command === "pi" || command === "piw") {
+  } else if (command === "piw") {
     process.chdir(workspace);
     const forwarded = args[0] === "--" ? args.slice(1) : args;
-    const binary = command === "pi" ? join(PACKAGE_ROOT, "bin/shims/pi") : piwCli;
-    const configured = command === "pi" ? ["--no-extensions", "--no-skills", "--no-context-files", ...adapterResources().extensions.flatMap(path => ["-e", path]), ...adapterResources().skills.flatMap(path => ["--skill", path]), ...forwarded] : forwarded;
-    const child = spawn(binary, configured, { cwd: workspace, stdio: "inherit" });
+    const child = spawn(piwCli, forwarded, { cwd: workspace, stdio: "inherit" });
     for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => child.kill(signal));
     child.on("error", error => { console.error(error.message); process.exitCode = 1; });
     child.on("exit", code => { process.exitCode = code ?? 1; });
   } else if (command === "serve" || command === "demo") {
-    if (command === "demo" && (loadConfig(workspace).providerWorkspace || (loadConfig(workspace).provider && loadConfig(workspace).provider !== "eaa-demo"))) throw new Error("Use a separate workspace for the demo; this workspace has a provider configured.");
+    if (command === "demo" && (loadConfig(workspace).provider && loadConfig(workspace).provider !== "eaa-demo")) throw new Error("Use a separate workspace for the demo; this workspace has a provider configured.");
     const model = command === "demo" ? await startModelFixture() : undefined;
     const instrument = command === "demo" ? await startInstrumentFixture() : undefined;
     if (model && instrument) {
-      writeJson(join(workspace, "eaa-pi.json"), { ...loadConfig(workspace), provider: "eaa-demo", model: "toy" });
+      const settingsPath = join(agentDir(workspace), "settings.json");
+      writeJson(settingsPath, { ...JSON.parse(readFileSync(settingsPath, "utf8")), defaultProvider: "eaa-demo", defaultModel: "toy" });
       const previousModels = existsSync(join(agentDir(workspace), "models.json")) ? JSON.parse(readFileSync(join(agentDir(workspace), "models.json"), "utf8")) : {};
       writeJson(join(agentDir(workspace), "models.json"), { ...previousModels, providers: { ...previousModels.providers, "eaa-demo": { baseUrl: model.url, api: "openai-completions", apiKey: "local-fixture", models: [{ id: "toy", name: "EAA deterministic fixture", reasoning: false, input: ["text", "image"], contextWindow: 128000, maxTokens: 4096, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }] } } });
       const previousMcp = JSON.parse(readFileSync(join(workspace, ".pi/mcp.json"), "utf8"));

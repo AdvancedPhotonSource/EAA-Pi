@@ -11,6 +11,7 @@ playwright-report/
 __pycache__/
 vendor/
 .eaa-pi
+.pi-experiment-ops
 
 AGENTS.md
 workspace/

@@ -29,26 +29,9 @@ For a real provider, initialize an EAA workspace:
 eaa-pi init --workspace /path/to/workspace
 ```
 
-**Already configured Argo in pi-experiment-ops?** Edit `/path/to/workspace/eaa-pi.json`:
+If the workspace is already configured for experiment-ops, its provider settings and sessions are ready to use. Otherwise configure the provider with `pi-experiment-ops configure`, or edit `.pi-experiment-ops/agent/models.json` and set `defaultProvider`/`defaultModel` in `.pi-experiment-ops/agent/settings.json`. Both interfaces read these native Pi files directly. `eaa-pi.json` contains only the web host and port.
 
-```json
-{
-  "provider": "argo",
-  "model": "YOUR_CONFIGURED_MODEL_ID",
-  "providerWorkspace": "/path/to/your/pi-experiment-ops-workspace",
-  "host": "127.0.0.1",
-  "port": 8010
-}
-```
-
-Use the workspace that contains `.pi-experiment-ops/agent/models.json`, rather than the package's installation directory. Set `providerWorkspace` to `"."` if both applications use the same workspace. EAA reads the selected provider/model definition and any matching `auth.json` credential from that workspace; you do not need to edit EAA's `models.json`. EAA refreshes its local copy at startup, including for subagents and workflows. Restart EAA after changing the source configuration. Environment-based credentials must also be exported in the shell that starts EAA.
-
-**Configuring a custom endpoint directly in EAA?** Leave `providerWorkspace` empty. Edit both generated files:
-
-- `eaa-pi.json`: select the provider **name** and model ID.
-- `.eaa-pi/agent/models.json`: define that provider's `baseUrl`, API protocol, authentication, and supported models. The provider name and model ID must match `eaa-pi.json`.
-
-For built-in Pi providers, select the provider/model and configure authentication; a custom `models.json` entry is optional. See [configuration and authentication](docs/configuration.md#real-provider-authentication) for complete examples and sharing behavior.
+See [configuration and authentication](docs/configuration.md#real-provider-authentication) for custom endpoints and legacy workspace migration.
 
 Then start EAA:
 
@@ -60,13 +43,13 @@ Native execution has the permissions of your operating-system account. The suppl
 
 ## Use Pi's terminal interface
 
-Launch Pi's TUI with an EAA workspace and its configured provider, without starting the web server:
+Launch the installed experiment-ops TUI in your workspace:
 
 ```bash
 eaa-pi pi --workspace /path/to/workspace -- --provider argo --model gpt55
 ```
 
-Replace `argo` and `gpt55` with your configured provider/model. Stop the web server before using the same workspace in the TUI. EAA's command loads its browser extension bridges; for regular terminal-only use with native terminal extensions, use `pi-experiment-ops pi --workspace /path/to/pi-workspace`. See [TUI and CLI usage](docs/installation.md#pi-tui-and-cli-passthrough) for configuration details.
+Replace `argo` and `gpt55` with a provider/model configured in `.pi-experiment-ops/agent`. The command delegates to the installed `pi-experiment-ops` launcher, including its native terminal extensions. The TUI and WebUI share primary sessions; use one interface per session at a time. See [TUI and CLI usage](docs/installation.md#pi-tui-and-cli-passthrough) for configuration details.
 
 ## Guides
 

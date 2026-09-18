@@ -16,6 +16,10 @@ The supported command suggestions are `/mode plan`, `/mode build`, `/skill:name`
 
 Open **Sessions & tools** to create a session, resume a listed session, or branch a session. Branch copies that Pi session's current history into a new primary session. Session replacement is rejected while primary generation, tools, child runs, workflows, processes, or terminals remain active; the response lists active work.
 
+Primary sessions in the WebUI, `eaa-pi pi`, and the experiment-ops TUI share the default directory: `<workspace>/.pi-experiment-ops/agent/sessions/<encoded-workspace>/`. Use either interface to resume them, with only one interface using a given session at a time. TUI launches with an explicit `--session-dir` use that override instead. WebUI settings, child transcripts, and adapter SQLite state remain under `.eaa-pi`.
+
+At WebUI or TUI startup, eaa-pi moves existing `.eaa-pi/agent/sessions/*.jsonl` transcripts and the old launcher's `<encoded-workspace>/*.jsonl` transcripts into the shared directory. The WebUI restores its active session there. Session IDs and WebUI metadata are preserved. If a destination file has different contents, startup reports a migration conflict and retains the source file. Stop both hosts before upgrading.
+
 **Launch reviewer** starts pi-subagents' asynchronous reader agent with the task text. Child conversations appear as events arrive. **Refresh runs** lists upstream async run IDs; **Send task** delivers a steering message and **Stop child** requests cancellation. These controls use pi-subagents' public event-bus RPC and retain its ownership and acknowledgment checks. The main composer addresses the primary agent; the child control addresses the selected run.
 
 Workflow agents appear in separate tabs while pi-graph runs them. Their launcher records JSON events even though pi-graph disables native child session persistence. Parent relationships and workflow run IDs are stored durably. Closing a conversation tab is a display action; it does not stop execution.

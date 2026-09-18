@@ -15,8 +15,7 @@ export default function (pi: ExtensionAPI) {
   let db: ReturnType<typeof openDb> | undefined;
   pi.on("session_start", (_event, ctx) => {
     db = openDb(join(ctx.cwd, ".pi/archive.db"));
-    for (const directory of ["sessions", "children"]) {
-      const root = join(process.env.PI_CODING_AGENT_DIR!, directory);
+    for (const root of [ctx.sessionManager.getSessionDir(), join(ctx.cwd, ".eaa-pi/agent/children")]) {
       if (existsSync(root)) for (const file of readdirSync(root)) {
         if (file.endsWith(".jsonl")) syncSessionFile(db, join(root, file));
       }

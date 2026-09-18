@@ -1,6 +1,7 @@
-import { initialize as initializeOps, configureEnvironment as configureOps, resources } from "pi-experiment-ops";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, realpathSync, chmodSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { initialize as initializeOps, configureEnvironment as configureOps, resources, workspacePaths } from "pi-experiment-ops";
+import { SettingsManager } from "pi-experiment-ops/sdk";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, copyFileSync, unlinkSync, constants } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -8,90 +9,88 @@ export const PACKAGE_ROOT = existsSync(join(ROOT, "package.json")) ? ROOT : reso
 export interface Config {
   provider: string;
   model: string;
-  providerWorkspace?: string;
   host: string;
   port: number;
 }
 export const defaults: Config = { provider: "", model: "", host: "127.0.0.1", port: 8010 };
 export const dataDir = (workspace: string) => join(workspace, ".eaa-pi");
-export const agentDir = (workspace: string) => join(dataDir(workspace), "agent");
+export const agentDir = (workspace: string) => workspacePaths(workspace).agentDirectory;
+export const sessionDir = (workspace: string) => workspacePaths(workspace).sessionDirectory;
+export function migrateLegacySessions(workspace: string) {
+  const legacy = join(dataDir(workspace), "agent", "sessions");
+  const target = sessionDir(workspace);
+  mkdirSync(target, { recursive: true });
+  for (const source of [legacy, join(legacy, basename(target))]) {
+    if (!existsSync(source)) continue;
+    for (const file of readdirSync(source).filter(file => file.endsWith(".jsonl"))) {
+      const from = join(source, file), to = join(target, file);
+      if (existsSync(to)) {
+        if (!readFileSync(from).equals(readFileSync(to))) throw new Error(`Session migration conflict: ${to}`);
+      } else copyFileSync(from, to, constants.COPYFILE_EXCL);
+      unlinkSync(from);
+    }
+  }
+}
 export const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, "utf8"));
 export function writeJson(path: string, value: unknown) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, JSON.stringify(value, null, 2) + "\n", { mode: 0o600 });
 }
 export function initialize(workspace: string): string {
-  mkdirSync(workspace, { recursive: true });
-  workspace = realpathSync(workspace);
-  for (const dir of [dataDir(workspace), agentDir(workspace), join(dataDir(workspace), "artifacts"), join(workspace, ".pi", "agents")]) {
+  workspace = initializeOps(workspace);
+  migrateLegacyConfiguration(workspace);
+  for (const dir of [dataDir(workspace), join(dataDir(workspace), "artifacts")]) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
-  initializeOps(workspace, agentDir(workspace));
-  for (const [name, path] of [["eaa-pi.json", join(workspace, "eaa-pi.json")], ["models.json", join(agentDir(workspace), "models.json")]]) {
-    if (!existsSync(path)) writeJson(path, readJson(join(PACKAGE_ROOT, "examples/config", name)));
-  }
+  const configPath = join(workspace, "eaa-pi.json");
+  if (!existsSync(configPath)) writeJson(configPath, readJson(join(PACKAGE_ROOT, "examples/config/eaa-pi.json")));
   return workspace;
 }
 export function configureEnvironment(workspace: string) {
-  configureOps(workspace, { dataDirectory: dataDir(workspace), agentDirectory: agentDir(workspace) });
+  configureOps(workspace);
   process.env.EAA_PI_ROOT = PACKAGE_ROOT;
   process.env.EAA_PI_WORKSPACE = workspace;
   process.env.PATH = [join(PACKAGE_ROOT, "bin/shims"), process.env.PATH].join(":");
 }
 export function loadConfig(workspace: string): Config {
-  const config = { ...defaults, ...readJson<Partial<Config>>(join(workspace, "eaa-pi.json")) };
-  if (config.provider === "YOUR_PROVIDER_NAME") config.provider = "";
-  if (config.model === "YOUR_MODEL_ID") config.model = "";
-  return config;
+  const web = readJson<{ host?: string; port?: number }>(join(workspace, "eaa-pi.json"));
+  const settings = SettingsManager.create(workspace, agentDir(workspace));
+  return { host: web.host ?? defaults.host, port: web.port ?? defaults.port,
+    provider: settings.getDefaultProvider() ?? "", model: settings.getDefaultModel() ?? "" };
 }
 
-// Materialize the selected provider locally so the SDK and upstream Pi children
-// use the same files without sharing sessions, extensions, or mutable settings.
-export function syncProviderConfiguration(workspace: string) {
-  const config = loadConfig(workspace);
-  const readOptional = (path: string): Record<string, any> => existsSync(path) ? readJson(path) : {};
-  const localModelsPath = join(agentDir(workspace), "models.json");
-  const localModels = readOptional(localModelsPath);
-  if (!config.providerWorkspace) {
-    if (applyModelInputDefaults(localModels)) writeJson(localModelsPath, localModels);
-    return;
+// Import legacy EAA configuration once; established experiment-ops providers win.
+export function migrateLegacyConfiguration(workspace: string) {
+  const legacy = join(dataDir(workspace), "agent");
+  const target = agentDir(workspace);
+  const configPath = join(workspace, "eaa-pi.json");
+  const config = existsSync(configPath) ? readJson<Record<string, any>>(configPath) : {};
+  const hasLegacySelection = ["provider", "model", "providerWorkspace"].some(key => Object.hasOwn(config, key));
+  const marker = join(dataDir(workspace), "workspace-migrated");
+  if (existsSync(marker) && !hasLegacySelection) return;
+  mkdirSync(target, { recursive: true });
+  const settingsPath = join(target, "settings.json");
+  const settings = existsSync(settingsPath) ? readJson<Record<string, any>>(settingsPath) : {};
+  const hasNativeProvider = settings.defaultProvider || settings.defaultModel || ["models.json", "auth.json"].some(name => existsSync(join(target, name)));
+  if (!hasNativeProvider) for (const name of ["models.json", "auth.json"]) {
+    const from = join(legacy, name), to = join(target, name);
+    if (existsSync(from)) copyFileSync(from, to, constants.COPYFILE_EXCL);
   }
-  if (typeof config.providerWorkspace !== "string") throw new Error("providerWorkspace must be a workspace path");
-  if (!config.provider || !config.model) throw new Error("Set provider and model in eaa-pi.json before using providerWorkspace");
-  const source = join(resolve(workspace, config.providerWorkspace), ".pi-experiment-ops/agent");
-  const modelsPath = join(source, "models.json");
-  if (!existsSync(modelsPath)) throw new Error(`Provider configuration not found: ${modelsPath}. providerWorkspace must point to a configured pi-experiment-ops workspace, not its installation directory.`);
-  const shared = readJson<{ providers?: Record<string, { models?: { id: string }[] }> }>(modelsPath);
-  const provider = shared.providers?.[config.provider];
-  if (!provider) throw new Error(`Provider ${config.provider} is not defined in ${modelsPath}`);
-  if (!provider.models?.some(model => model.id === config.model)) throw new Error(`Model ${config.model} is not defined for ${config.provider} in ${modelsPath}`);
-  const auth = readOptional(join(source, "auth.json"));
-  const localAuthPath = join(agentDir(workspace), "auth.json");
-  const localAuth = readOptional(localAuthPath);
-  localModels.providers = { ...localModels.providers, [config.provider]: provider };
-  // A stale local credential must not override the selected source's apiKey.
-  delete localAuth[config.provider];
-  if (Object.hasOwn(auth, config.provider)) localAuth[config.provider] = auth[config.provider];
-  applyModelInputDefaults(localModels);
-  for (const [path, value] of [[localModelsPath, localModels], [localAuthPath, localAuth]] as const) {
-    const text = JSON.stringify(value, null, 2) + "\n";
-    if (!existsSync(path) || readFileSync(path, "utf8") !== text) writeJson(path, value);
-    chmodSync(path, 0o600);
-  }
-}
-
-// Persist defaults for upstream Pi processes that read models.json themselves.
-function applyModelInputDefaults(config: { providers?: Record<string, { models?: { input?: string[] }[] }> }) {
   let changed = false;
-  for (const provider of Object.values(config.providers ?? {})) {
-    for (const model of provider.models ?? []) {
-      if (!Object.hasOwn(model, "input")) {
-        model.input = ["text", "image"];
-        changed = true;
-      }
+  for (const [old, key] of [["provider", "defaultProvider"], ["model", "defaultModel"]]) {
+    if (!hasNativeProvider && typeof config[old] === "string" && config[old] && !config[old].startsWith("YOUR_")) {
+      settings[key] = config[old]; changed = true;
     }
   }
-  return changed;
+  if (changed) writeJson(settingsPath, settings);
+  if (hasLegacySelection) {
+    for (const key of ["provider", "model", "providerWorkspace"]) delete config[key];
+    writeJson(configPath, config);
+  }
+  if (existsSync(legacy) || hasLegacySelection) {
+    mkdirSync(dataDir(workspace), { recursive: true });
+    writeFileSync(marker, "Native experiment-ops workspace configured.\n");
+  }
 }
 
 export function adapterResources() {

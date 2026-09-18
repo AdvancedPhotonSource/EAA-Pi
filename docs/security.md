@@ -19,7 +19,7 @@ podman run --rm --userns=keep-id:uid=1000,gid=1000 --user 1000:1000 \
 
 For Docker, omit the Podman `--userns=keep-id` option and arrange for the workspace to be writable by UID/GID 1000. `docker compose up --build` uses the supplied `compose.yaml`; create the bind directories and configure the workspace before starting real-provider service. Switch its command to `demo` for the credential-free fixture.
 
-To reuse a configured `pi-experiment-ops` workspace, add a read-only mount such as `-v /path/to/ops-workspace:/provider-source:ro`, set `"providerWorkspace": "/provider-source"` in EAA's `eaa-pi.json`, and run `serve`. The source files must be readable by the container user. EAA writes its selected provider and credential copies inside the writable EAA workspace.
+To reuse a configured experiment-ops workspace, mount it as the container's writable workspace and run `serve`. Both interfaces use its `.pi-experiment-ops/agent` configuration and sessions. The files must be accessible to the container user.
 
 The image runs as non-root, with a read-only application/root filesystem, read-only `/fixtures`, and writable `/workspace` and temporary storage. No host container socket is mounted. All local descendants inherit this boundary, including Python graph runners and Pi child CLIs. Expose additional host files only through explicit mounts. Credentials placed in the workspace are server-side but available to trusted agent execution inside this boundary.
 
