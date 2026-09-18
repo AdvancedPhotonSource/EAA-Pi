@@ -11,13 +11,22 @@
 | Pi native sessions and archive integration | Adapter SQLite, gallery, relationships and completion deduplication |
 | CLI and independent Pi/graph acceptance | React frontend, static notices, browser/integration/container acceptance |
 
-The bundle API exposes resource paths, executables, workspace setup, and Pi-loadable upstream wrapper APIs. EAA replaces four resource entries explicitly, preserving exactly eight loaded extensions. The graph child recorder remains an EAA adapter because it creates frontend conversation relationships. Native terminal behavior is retained in the standalone bundle.
+The bundle API exposes resource paths, executables, workspace setup, and Pi-loadable upstream wrapper APIs. EAA replaces the policy, MCP, terminal, and archive entries, and wraps CodeMode when the bundle includes it to track background cells in the execution queue. The graph child recorder remains an EAA adapter because it creates frontend conversation relationships. Native terminal behavior is retained in the standalone bundle.
 
 EAA includes `vendor/pi-experiment-ops-0.2.0.tgz` and declares it as a `file:vendor/...` dependency. This is a release artifact with integrity recorded by npm, not a link to another checkout. npm bundles the installed dependency and its runtime dependencies in the application tarball. The prepack hook gives installed hard-linked files independent inodes, preserving their bytes and modes, so npm can extract bundled executables reliably. Docker builds copy the vendored release before installing. Both source and tarball installation work when the separate bundle source repository is absent.
 
 ## Developing both repositories together
 
 Make backend changes in the experiment-ops repository, run its tests, and pack a versioned artifact. Update eaa-pi through `scripts/update-pi-bundle.mjs`, then reinstall and rebuild. This tests the same package boundary used by releases.
+
+For local development, link an installed experiment-ops checkout into EAA without changing its release manifest or shrinkwrap:
+
+```bash
+npm install --no-save --package-lock=false --legacy-peer-deps /absolute/path/to/pi-experiment-ops
+node --input-type=module -e 'import { packageRoot } from "pi-experiment-ops"; console.log(packageRoot)'
+```
+
+The printed path should be the checkout. Restart EAA or Pi after editing bundle resources; these JavaScript and TypeScript resources load at runtime and do not require rebuilding EAA. EAA source changes still require its normal build. `npm ci` restores the pinned release dependency; run the installer afterward to provision that installation's Python runtime.
 
 EAA supplies its own policy, MCP, terminal, and archive bridges. Changes confined to experiment-ops' native entrypoints affect its standalone CLI; browser adaptations remain in EAA.
 

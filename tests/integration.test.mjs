@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, readFileSync, existsSync, symlinkSync, read
 import { tmpdir } from "node:os";
 import { join, basename } from "node:path";
 import { SessionManager } from "pi-experiment-ops/sdk";
+import { resources } from "pi-experiment-ops";
 import { spawn } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { initialize, configureEnvironment, writeJson, agentDir, sessionDir, PACKAGE_ROOT } from "../dist/server/config.js";
@@ -67,7 +68,7 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
   });
 
   await t.test("extension startup and SSE streaming", async () => {
-    assert.equal(runtime.extensions.length, 8);
+    assert.equal(runtime.extensions.length, resources().extensions.length);
     
     assert.equal(runtime.snapshot.logs.filter(l => l.level === "error").length, 0);
     const tools = await request("/api/tool-schemas");
@@ -130,7 +131,8 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     assert.equal(runtime.snapshot.message_queue.filter(j => j.job_id === `process:${process.process.id}`).length, 1);
     await idle();
     await request("/api/mode", { plan_mode: true });
-    for (const name of runtime.session.getActiveToolNames()) assert.ok(["read", "grep", "find", "ls", "pi_modes_plan_complete"].includes(name), name);
+    // CodeMode retains its control tools; EAA's policy still blocks their execution in plan mode.
+    for (const name of runtime.session.getActiveToolNames()) assert.ok(["read", "grep", "find", "ls", "pi_modes_plan_complete", "codemode_execute", "codemode_result", "codemode_cancel", "codemode_sessions", "codemode_search"].includes(name), name);
     await request("/api/processes", { command: "touch forbidden" }, 409);
     await request("/api/terminals", {}, 409);
     await request("/api/workflows/run", { workflow: "toy", input: "forbidden" }, 409);
@@ -138,8 +140,67 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     await request("/api/input", { content: "!touch forbidden" }, 409);
     // Adversarial fixture emits a writer even when the advertised tools omit it.
     await prompt('fixture-tool {"name":"write","arguments":{"path":"forbidden","content":"no"}}');
+    if (runtime.session.getActiveToolNames().includes("codemode_execute")) {
+      await prompt('fixture-tool {"name":"codemode_execute","arguments":{"script":"await tools.write({path: \'forbidden\', content: \'no\'});","wait":false}}');
+      const result = runtime.session.messages.filter(message => message.role === "toolResult" && message.toolName === "codemode_execute").at(-1);
+      assert.equal(result.isError, true);
+      assert.match(JSON.stringify(result.content), /reader tools only/);
+    }
     assert.equal(existsSync(join(workspace, "forbidden")), false);
     await request("/api/mode", { plan_mode: false });
+  });
+  await t.test("background CodeMode cells stay queued until completion, failure, or cancellation", async t => {
+    if (!runtime.session.getActiveToolNames().includes("codemode_execute")) return t.skip("Installed bundle does not include CodeMode");
+    const launch = async (script, sessionId) => {
+      await prompt("fixture-tool " + JSON.stringify({ name: "codemode_execute", arguments: { script, wait: false, ...(sessionId ? { sessionId } : {}) } }));
+      const message = runtime.session.messages.filter(message => message.role === "toolResult" && message.toolName === "codemode_execute").at(-1);
+      assert.equal(message.details.result, "pending", JSON.stringify(message));
+      return { jobId: `codemode:${message.toolCallId}`, sessionId: message.details.sessionId };
+    };
+    const completed = jobId => wait(() => runtime.snapshot.message_queue.find(job => job.job_id === jobId));
+    const slow = 'await tools.toy_operate({operation:"codemode-queue", durationMs:3000, background:false}); return {done:true};';
+    const first = await launch(slow);
+    assert.ok(runtime.snapshot.tool_execution_queue.some(job => job.job_id === first.jobId));
+    assert.equal(runtime.snapshot.message_queue.some(job => job.job_id === first.jobId), false);
+    await request("/api/mode", { plan_mode: true }, 409);
+    await request("/api/sessions", { action: "new" }, 409);
+    await prompt("chat while CodeMode is running");
+    const requestCount = model.requests.length;
+    assert.equal((await completed(first.jobId)).status, "completed");
+    assert.equal(model.requests.length, requestCount, "UI polling must not query the LLM");
+    assert.equal(runtime.session.messages.some(message => message.role === "toolResult" && message.toolName === "codemode_result"), false, "UI polling must not inject tool results into the agent transcript");
+    assert.equal(instrument.events.filter(event => event.operation === "codemode-queue" && event.event === "start").length, 1);
+    assert.equal(runtime.snapshot.message_queue.filter(job => job.job_id === first.jobId).length, 1);
+
+    const second = await launch('return "another cell";', first.sessionId);
+    assert.notEqual(first.jobId, second.jobId, "Reusing a CodeMode session must create a separate history entry");
+    assert.equal((await completed(second.jobId)).status, "completed");
+    const failed = await launch('throw new Error("CodeMode test failure");');
+    assert.equal((await completed(failed.jobId)).status, "failed");
+    assert.match((await completed(failed.jobId)).content, /CodeMode test failure/);
+
+    const cancelled = await launch(slow);
+    await request(`/api/jobs/${encodeURIComponent(cancelled.jobId)}/cancel`, {});
+    assert.equal((await completed(cancelled.jobId)).status, "cancelled");
+    assert.equal(runtime.snapshot.tool_execution_queue.some(job => job.job_id === cancelled.jobId), false);
+    await prompt("fixture-tool " + JSON.stringify({ name: "codemode_result", arguments: { sessionId: first.sessionId } }));
+    const result = runtime.session.messages.filter(message => message.role === "toolResult" && message.toolName === "codemode_result").at(-1);
+    assert.equal(result.details.result, "success", "UI polling leaves the result available to the agent");
+
+    const confirm = runtime.session.getToolDefinition("eaa_confirm");
+    const original = confirm.execute;
+    const usage = { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 3, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+    confirm.execute = async () => ({ content: [{ type: "text", text: "Metadata fixture" }], details: {}, usage });
+    try {
+      const accounted = await launch('return await tools.eaa_confirm({message:"metadata fixture"});');
+      assert.equal((await completed(accounted.jobId)).status, "completed");
+      await prompt("fixture-tool " + JSON.stringify({ name: "codemode_result", arguments: { sessionId: accounted.sessionId } }));
+      const accountedResult = runtime.session.messages.filter(message => message.role === "toolResult" && message.toolName === "codemode_result").at(-1);
+      assert.deepEqual(accountedResult.usage, usage, "UI polling preserves the agent's one-shot usage metadata");
+      await prompt("fixture-tool " + JSON.stringify({ name: "codemode_result", arguments: { sessionId: accounted.sessionId } }));
+      const repeatedResult = runtime.session.messages.filter(message => message.role === "toolResult" && message.toolName === "codemode_result").at(-1);
+      assert.equal(repeatedResult.usage, undefined, "Polling must not duplicate usage accounting");
+    } finally { confirm.execute = original; }
   });
   await t.test("real persistent PTY", async () => {
     const result = await request("/api/terminals", {}, 201);
@@ -215,7 +276,7 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     assert.equal(scan.status, 200);
     await Promise.all([client("agent-a-move"), client("agent-b-move")]);
     assert.equal(instrument.events.filter(e => e.operation.startsWith("agent-") && e.event === "end").length, 2);
-    assert.deepEqual(instrument.events.map(e => e.event), ["start", "end", "start", "end", "start", "end", "start", "end"]);
+    assert.deepEqual(instrument.events.filter(e => ["scan", "long-scan", "agent-a-move", "agent-b-move"].includes(e.operation)).map(e => e.event), ["start", "end", "start", "end", "start", "end", "start", "end"]);
   });
   await t.test("archive, host restart, reconnect, and session isolation", async () => {
     await idle();
@@ -232,6 +293,12 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     assert.ok(runtime.store.db.prepare("SELECT count(*) AS count FROM artifacts").get().count > 0);
     const abandonedProcess = await runtime.startProcess("sleep 30");
     const abandonedTerminal = await runtime.openTerminal();
+    let abandonedCell;
+    if (runtime.session.getActiveToolNames().includes("codemode_execute")) {
+      await prompt("fixture-tool " + JSON.stringify({ name: "codemode_execute", arguments: { script: "await tools.bash({command:'sleep 30'});", wait: false } }));
+      abandonedCell = runtime.snapshot.tool_execution_queue.find(job => job.job_id.startsWith("codemode:"))?.job_id;
+      assert.ok(abandonedCell);
+    }
     const sharedFile = runtime.session.sessionFile;
     await app.close();
     // Simulate upgrading a workspace whose active transcript is in the old store.
@@ -250,6 +317,10 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     assert.equal(runtime.session.sessionManager.getSessionDir(), sessionDir(workspace));
     assert.equal(runtime.snapshot.conversations.find(c => c.id === `process:${abandonedProcess.process.id}`).status, "interrupted");
     assert.equal(runtime.snapshot.conversations.find(c => c.id === `terminal:${abandonedTerminal.details.sessionId}`).terminal.status, "interrupted");
+    if (abandonedCell) {
+      assert.equal(runtime.snapshot.message_queue.find(job => job.job_id === abandonedCell)?.status, "interrupted");
+      assert.equal(runtime.snapshot.tool_execution_queue.some(job => job.job_id === abandonedCell), false);
+    }
     for (const child of before.conversations.filter(c => c.kind !== "primary")) assert.ok(runtime.snapshot.conversations.some(c => c.id === child.id));
     const origin = await fetch(app.url + "/api/input", { method: "POST", headers: { Origin: "https://example.com", "Content-Type": "application/json" }, body: '{"content":"bad"}' });
     assert.equal(origin.status, 403);

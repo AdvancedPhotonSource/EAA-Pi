@@ -157,3 +157,31 @@ test("subagent section lists agents and handles an empty catalog", async ({ page
   await expect(select).toHaveValue("");
   await expect(launch).toBeDisabled();
 });
+
+test("background CodeMode cells remain visible across reload and can be stopped", async ({ page, request }) => {
+  const schemas = await (await request.get("/api/tool-schemas")).json();
+  test.skip(!schemas.tools.some((tool: any) => tool.function.name === "codemode_execute"), "Installed bundle does not include CodeMode");
+  await expect.poll(async () => (await (await request.get("/api/state")).json()).tool_execution_queue.length).toBe(0);
+  await page.goto("/");
+  const launch = async () => {
+    const content = "fixture-tool " + JSON.stringify({ name: "codemode_execute", arguments: { script: 'return await tools.toy_operate({operation:"browser-codemode", durationMs:3000, background:false});', wait: false } });
+    expect((await request.post("/api/input", { data: { content } })).status()).toBe(201);
+    const queue = page.getByRole("region", { name: "Tool execution queue", exact: true });
+    const card = queue.locator("article").filter({ hasText: "codemode_execute" });
+    await expect(card).toBeVisible();
+    await expect(card.locator("code")).toHaveText(/^codemode:/);
+    return (await card.locator("code").textContent())!;
+  };
+  const first = await launch();
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Tool execution queue", exact: true }).getByText(first, { exact: true })).toBeVisible();
+  const history = page.getByRole("region", { name: "Execution history", exact: true });
+  await expect(history.locator("article").filter({ hasText: first })).toContainText("completed");
+  await expect(history.locator("article").filter({ hasText: first })).toHaveCount(1);
+  const second = await launch();
+  await page.getByRole("button", { name: "Expand sessions and tools" }).click();
+  await page.getByRole("heading", { name: "Active jobs", exact: true }).locator("..").getByRole("button", { name: "Stop", exact: true }).click();
+  await page.getByRole("button", { name: "Collapse sessions and tools" }).click();
+  await expect(history.locator("article").filter({ hasText: second })).toContainText("cancelled");
+  await expect(page.getByRole("region", { name: "Tool execution queue", exact: true }).getByText(second, { exact: true })).toHaveCount(0);
+});

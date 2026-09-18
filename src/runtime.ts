@@ -34,6 +34,7 @@ export class Runtime extends EventEmitter {
   private subagentIds = new Set<string>();
   private terminalIds = new Set<string>();
   private terminalReads = new Map<string, Promise<void>>();
+  private codeModeJobs = new Map<string, { sessionId: string; ordinal?: number }>();
   private polling = false;
   private buildTools: string[] = [];
   private childSessions = new Map<string, SessionManager>();
@@ -120,6 +121,7 @@ export class Runtime extends EventEmitter {
     this.publish("snapshot", this.snapshot);
   }
   private bindBus() {
+    this.bus.on("eaa:codemode-status", (result: any) => this.codeModeStatus(result));
     this.bus.on("eaa:context", (ctx: any) => {
       this.context = ctx;
       ctx.ui.notify = (message: string, level: string = "info") => this.log("extension", message, level);
@@ -195,7 +197,17 @@ export class Runtime extends EventEmitter {
       this.log("tool", `${event.toolName}: started`);
     }
     if (event.type === "tool_execution_end") {
-      this.finishJob(`tool:${event.toolCallId}`, event.isError ? "failed" : "completed", `${event.toolName} ${event.isError ? "failed" : "completed"}`);
+      const result = event.result?.details;
+      if (conversationId === "primary" && event.toolName === "codemode_execute" && result?.result === "pending" && typeof result.sessionId === "string") {
+        const jobId = `codemode:${event.toolCallId}`;
+        const job = this.snapshot.tool_execution_queue.find(job => job.job_id === `tool:${event.toolCallId}`);
+        if (job) job.job_id = jobId;
+        this.codeModeJobs.set(jobId, { sessionId: result.sessionId, ordinal: result.presentation?.cell_ordinal });
+        this.publish("queue.changed", this.snapshot);
+      } else {
+        const failed = event.isError || (event.toolName === "codemode_execute" && result?.result === "failed");
+        this.finishJob(`tool:${event.toolCallId}`, failed ? "failed" : "completed", `${event.toolName} ${failed ? "failed" : "completed"}`);
+      }
       if (event.toolName === "interactive_shell" && event.result?.details?.sessionId) this.trackTerminal(event.result.details.sessionId, event.result.details.command || "Interactive shell");
       if (event.toolName === "subagent") {
         const runId = event.result?.details?.asyncId ?? event.result?.details?.runId ?? event.result?.details?.id;
@@ -226,6 +238,22 @@ export class Runtime extends EventEmitter {
       this.snapshot.message_queue = this.snapshot.message_queue.slice(-200);
     }
     this.publish("queue.changed", this.snapshot);
+  }
+  private codeModeStatus(result: any) {
+    if (!result || this.closing) return;
+    for (const [jobId, job] of this.codeModeJobs) {
+      if (job.sessionId !== result.sessionId) continue;
+      const ordinal = result.presentation?.cell_ordinal;
+      if (ordinal != null && job.ordinal != null && ordinal < job.ordinal) continue;
+      const superseded = ordinal != null && job.ordinal != null && ordinal > job.ordinal;
+      if (!superseded && result.result === "pending") continue;
+      const status = superseded ? "unknown" : result.error?.code === "cancellation" ? "cancelled" : result.result === "success" ? "completed" : "failed";
+      this.codeModeJobs.delete(jobId);
+      this.finishJob(jobId, status, superseded ? "CodeMode cell result was replaced before it could be observed." : `CodeMode ${status}${result.error?.message ? `: ${result.error.message}` : ""}`);
+    }
+  }
+  private codeModeRequest(action: "result" | "cancel", sessionId: string): Promise<any> {
+    return new Promise((resolve, reject) => this.bus.emit("eaa:codemode", { id: id(), action, sessionId, resolve, reject }));
   }
   activeWork(): string[] {
     return [...new Set([
@@ -386,6 +414,9 @@ export class Runtime extends EventEmitter {
     if (this.polling || this.closing) return;
     this.polling = true;
     try {
+      for (const sessionId of new Set([...this.codeModeJobs.values()].map(job => job.sessionId))) {
+        this.codeModeStatus(await this.codeModeRequest("result", sessionId));
+      }
       const trace = join(dataDir(this.workspace), "mcp-trace.jsonl");
       if (existsSync(trace)) {
         const lines = readFileSync(trace, "utf8").trimEnd().split("\n");
@@ -463,6 +494,16 @@ export class Runtime extends EventEmitter {
     this.publish("terminal.finished", { conversation_id: conversation.id, terminal: conversation.terminal });
   }
   async cancelJob(jobId: string) {
+    const cell = this.codeModeJobs.get(jobId);
+    if (cell) {
+      // Check the latest cell before cancelling a reusable CodeMode session.
+      this.codeModeStatus(await this.codeModeRequest("result", cell.sessionId));
+      if (this.codeModeJobs.get(jobId) === cell) {
+        await this.codeModeRequest("cancel", cell.sessionId);
+        this.codeModeStatus(await this.codeModeRequest("result", cell.sessionId));
+      }
+      return { ok: true };
+    }
     if (jobId.startsWith("process:")) return this.busRequest("processes:command:kill", { id: jobId.slice(8), timeoutMs: 3000 });
     if (jobId.startsWith("terminal:")) { await this.terminal({ sessionId: jobId.slice(9), kill: true }, true); this.terminalFinished(jobId.slice(9), "cancelled"); return { ok: true }; }
     if (jobId.startsWith("subagent:")) return this.childAction(jobId.slice(9), "stop");
@@ -500,6 +541,8 @@ export class Runtime extends EventEmitter {
     for (const terminalId of [...this.terminalIds]) this.terminalFinished(terminalId, "interrupted");
     while (this.polling) await new Promise(resolve => setTimeout(resolve, 10));
     await this.session?.abort();
+    for (const jobId of this.codeModeJobs.keys()) this.finishJob(jobId, "interrupted", "Host stopped; CodeMode cell was not resumed.");
+    this.codeModeJobs.clear();
     if (this.session) {
       await this.session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" });
       await Promise.all(this.terminalReads.values());

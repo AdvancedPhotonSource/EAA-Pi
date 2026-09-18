@@ -663,9 +663,9 @@ function QueueRegion({
             {!toolExecutions.length ? <div className="eaa-queue-empty">No tools executing.</div> : null}
           </div>
         </section>
-        <section className="eaa-queue-column" aria-label="Message queue">
+        <section className="eaa-queue-column" aria-label="Execution history">
           <div className="eaa-queue-column-header">
-            <span>Message queue</span>
+            <span>Execution history</span>
             <span className="eaa-queue-count">{messages.length}</span>
           </div>
           <div className="eaa-queue-list">
@@ -685,7 +685,7 @@ function QueueRegion({
                 <pre className="eaa-queue-message">{entry.content}</pre>
               </article>
             ))}
-            {!messages.length ? <div className="eaa-queue-empty">No messages waiting.</div> : null}
+            {!messages.length ? <div className="eaa-queue-empty">No completed executions yet.</div> : null}
           </div>
         </section>
       </div>

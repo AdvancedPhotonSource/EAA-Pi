@@ -25,7 +25,7 @@ flowchart LR
 
 Pi owns primary agent execution, messages, tool calls, provider transport, and session files. Pi-subagents owns child launch/steer/stop/lifecycle. Pi-processes owns process execution. Pi-interactive-shell owns PTYs. Pi-graph owns workflow scheduling, gates, cancellation, run ledgers, and resume. The adapter owns browser transport, resource controls, display projections, artifact registration, and completion deduplication.
 
-The SDK host loads eight extension entry points: policy, MCP factory bridge, terminal registration bridge, upstream subagents, upstream processes, upstream modes, archive discovery bridge, and upstream graph. Bridges wrap extension registration or consume public events. Dependency files are unchanged.
+The SDK host loads the bundle's extension entry points: policy, MCP factory bridge, terminal registration bridge, upstream subagents, upstream processes, upstream modes, archive discovery bridge, upstream graph, and CodeMode when available. The EAA CodeMode bridge preserves one-shot agent metadata while the host polls background results for its execution queue. Bridges wrap extension registration or consume public events. Dependency files are unchanged.
 
 The archive bridge scopes startup discovery to application sessions instead of the upstream extension's default home-directory scan. It retains the upstream search tool, schema, and turn indexer. Graph recordings are persisted with Pi's SessionManager and indexed through the pinned archive's exported indexer. A child session includes an `eaa-parent` custom entry; adapter metadata additionally maps it to the primary/workflow run.
 
@@ -65,7 +65,7 @@ POST bodies are JSON. Errors return `{ "error": "...", "message": "..." }`. HTTP
 | `POST /api/subagents/:id/steer` | `{message}`; ID is the upstream async run ID |
 | `POST /api/subagents/:id/stop` | Stop the owned async run |
 | `POST /api/processes` | `{command}` → upstream process result |
-| `POST /api/jobs/:id/cancel` | URL-encoded `process:…`, `terminal:…`, `subagent:…`, or `workflow:…` ID |
+| `POST /api/jobs/:id/cancel` | URL-encoded `process:…`, `terminal:…`, `subagent:…`, `workflow:…`, or `codemode:…` ID |
 | `GET /api/workflows` | Available workflow names and host workflow records for the active primary session |
 | `POST /api/workflows/run` | `{input, workflow}` |
 | `POST /api/workflows/resume` | `{id: hostRunId}` |

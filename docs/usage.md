@@ -28,6 +28,8 @@ Workflow agents appear in separate tabs while pi-graph runs them. Their launcher
 
 The model can launch a background script using the upstream `process` tool. Its output appears in a terminal-style tab, its state appears in the execution panel, and completion is recorded once. The primary conversation remains available while it runs. **Stop** in Sessions & tools cancels the corresponding job.
 
+When the installed bundle includes CodeMode, cells launched with `codemode_execute(wait: false)` remain in **Tool execution queue** until they finish. EAA polls their status and moves each cell into **Execution history** on completion, failure, or cancellation. Reusing a CodeMode session creates a separate entry for each cell. **Sessions & tools → Active jobs → Stop** cancels that CodeMode session. The agent retrieves results through `codemode_result`; UI polling does not add messages to its context. Background cells prevent session replacement and plan-mode changes while active, and host shutdown marks unfinished cells interrupted.
+
 The agent can use pi-interactive-shell's `interactive_shell` tool to start a command in a persistent pseudo-terminal (PTY), send input, read output, and stop the session. Shell environment variables and the working directory persist within the session. This supports interactive programs and SSH clients where installed and configured.
 
 The EAA host launches these sessions in headless background dispatch mode and disables quiet auto-close. Output polling uses the upstream supported five-second minimum query interval. Automated tests cover local Bash PTYs; remote SSH authentication and networking require separate deployment validation.

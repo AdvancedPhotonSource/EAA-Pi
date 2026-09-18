@@ -94,5 +94,7 @@ export function migrateLegacyConfiguration(workspace: string) {
 }
 
 export function adapterResources() {
-  return resources(Object.fromEntries(["policy", "mcp", "terminal", "archive"].map(name => [name, join(PACKAGE_ROOT, `extensions/${name}.ts`)])));
+  const paths = resources(Object.fromEntries(["policy", "mcp", "terminal", "archive"].map(name => [name, join(PACKAGE_ROOT, `extensions/${name}.ts`)])));
+  paths.extensions = paths.extensions.map(path => path.endsWith("/@ian-pascoe/pi-codemode/src/index.ts") ? join(PACKAGE_ROOT, "extensions/codemode.ts") : path);
+  return paths;
 }
