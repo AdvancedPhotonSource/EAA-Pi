@@ -1,5 +1,5 @@
 import shell from "pi-experiment-ops/shell";
-import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "pi-experiment-ops/sdk";
 
 // Adapt the upstream factory's public tool registration, without reaching into its manager.
 export default function (pi: ExtensionAPI) {

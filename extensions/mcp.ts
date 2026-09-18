@@ -2,7 +2,7 @@ import { createMcpAdapter } from "pi-experiment-ops/mcp";
 import { getServerPrefix } from "pi-experiment-ops/mcp-types";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "pi-experiment-ops/sdk";
 
 export default function (pi: ExtensionAPI) {
   const config = JSON.parse(readFileSync(join(process.env.EAA_PI_WORKSPACE || process.cwd(), ".pi/mcp.json"), "utf8"));

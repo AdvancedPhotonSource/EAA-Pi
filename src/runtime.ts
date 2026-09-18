@@ -5,7 +5,7 @@ import { Type } from "typebox";
 import {
   createAgentSession, createEventBus, DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager, initTheme,
   type AgentSession, type EventBus, type ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+} from "pi-experiment-ops/sdk";
 import { agentDir, dataDir, adapterResources, configureEnvironment, loadConfig, syncProviderConfiguration, type Config } from "./config.js";
 import { Store, id, timestamp, type Snapshot, type Conversation, type Message } from "./store.js";
 

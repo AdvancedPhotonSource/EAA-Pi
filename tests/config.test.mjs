@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { ModelRuntime } from "pi-experiment-ops/sdk";
 import { initialize, agentDir, loadConfig, writeJson, syncProviderConfiguration } from "../dist/server/config.js";
 
 test("init creates usable custom provider templates and preserves edited configuration", async t => {

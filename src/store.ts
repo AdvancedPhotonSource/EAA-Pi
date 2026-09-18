@@ -84,7 +84,7 @@ export class Store {
   artifactFile(path: string): string {
     const absolute = realpathSync(path);
     const root = realpathSync(this.workspace) + "/";
-    if (!absolute.startsWith(root) || absolute.includes("/.eaa-pi/agent/") || absolute.includes("/.pi/")) throw new Error("Image is outside the workspace artifact scope");
+    if (!absolute.startsWith(root) || absolute.includes("/.eaa-pi/agent/") || absolute.includes("/.pi-experiment-ops/agent/") || absolute.includes("/.pi/")) throw new Error("Image is outside the workspace artifact scope");
     const mime = ({ ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp" } as Record<string, string>)[extname(absolute).toLowerCase()];
     return this.artifact(readFileSync(absolute), mime);
   }

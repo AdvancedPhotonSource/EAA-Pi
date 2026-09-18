@@ -1,4 +1,4 @@
-import { createReadTool, createBashTool, createEditTool, createWriteTool, createGrepTool, createFindTool, createLsTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createReadTool, createBashTool, createEditTool, createWriteTool, createGrepTool, createFindTool, createLsTool, type ExtensionAPI } from "pi-experiment-ops/sdk";
 import { registerRequiredChildExtensions } from "pi-experiment-ops/subagents";
 import { mkdirSync, appendFileSync } from "node:fs";
 import { join } from "node:path";

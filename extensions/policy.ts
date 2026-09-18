@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "pi-experiment-ops/sdk";
 import { registerRequiredChildExtensions } from "pi-experiment-ops/subagents";
 import { join } from "node:path";
 

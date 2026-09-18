@@ -1,5 +1,5 @@
 import archive, { openDb, syncSessionFile } from "pi-experiment-ops/archive";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "pi-experiment-ops/sdk";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
