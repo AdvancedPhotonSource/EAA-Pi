@@ -33,11 +33,11 @@ Session replacement disposes the current runtime, emits shutdown, reloads resour
 
 ## Snapshot and events
 
-`GET /api/state` returns `conversations`, `logs`, `status`, `input_requested`, `interrupt_requested`, `plan_mode`, `tool_execution_queue`, `message_queue`, `session_id`, `sequence`, and capability flags. A conversation contains an ID, label, kind, optional parent/status/terminal/approval, and messages. Tool schemas follow the EAA function-schema envelope.
+`GET /api/state` returns `conversations`, `logs`, `status`, `input_requested`, `interrupt_requested`, `plan_mode`, `tool_execution_queue`, `message_queue`, `session_id`, `sequence`, and capability flags. A conversation contains an ID, label, kind, optional parent/status/approval, and messages. Tool schemas follow the EAA function-schema envelope.
 
-`GET /api/events` uses Server-Sent Events. Every connection begins with `snapshot`, including reconnects with Last-Event-ID. Subsequent events carry a monotonically increasing SSE `id` within the primary session. The authoritative snapshot resets the browser's sequence when switching sessions. Messages have stable IDs derived from Pi's role/timestamp/tool-call identity and are replaced during streaming. Terminal updates carry a separate per-terminal sequence. Completed jobs are inserted once using a SQLite unique key.
+`GET /api/events` uses Server-Sent Events. Every connection begins with `snapshot`, including reconnects with Last-Event-ID. Subsequent events carry a monotonically increasing SSE `id` within the primary session. The authoritative snapshot resets the browser's sequence when switching sessions. Messages have stable IDs derived from Pi's role/timestamp/tool-call identity and are replaced during streaming. Completed jobs are inserted once using a SQLite unique key.
 
-Event types include `message.created`, `conversation.created`, `conversation.terminated`, `status.changed`, `queue.changed`, `terminal.output.appended`, `terminal.finished`, `approval.requested`, `interrupt.requested`, `interrupt.cleared`, and `log.created`. Images attached to Pi messages are displayed in the browser's image panel and gallery. Workflow files remain in the runner's output directory.
+Event types include `message.created`, `conversation.created`, `conversation.terminated`, `status.changed`, `queue.changed`, `approval.requested`, `interrupt.requested`, `interrupt.cleared`, and `log.created`. Images attached to Pi messages are displayed in the browser's image panel and gallery. Workflow files remain in the runner's output directory.
 
 ## HTTP API
 
@@ -65,8 +65,6 @@ POST bodies are JSON. Errors return `{ "error": "...", "message": "..." }`. HTTP
 | `POST /api/subagents/:id/steer` | `{message}`; ID is the upstream async run ID |
 | `POST /api/subagents/:id/stop` | Stop the owned async run |
 | `POST /api/processes` | `{command}` → upstream process result |
-| `POST /api/terminals` | `{command?: "bash --noprofile --norc"}` → upstream `details.sessionId` |
-| `POST /api/terminals/:id/input` | `{input, submit?: true}` |
 | `POST /api/jobs/:id/cancel` | URL-encoded `process:…`, `terminal:…`, `subagent:…`, or `workflow:…` ID |
 | `GET /api/workflows` | Available workflow names and host workflow records for the active primary session |
 | `POST /api/workflows/run` | `{input, workflow}` |

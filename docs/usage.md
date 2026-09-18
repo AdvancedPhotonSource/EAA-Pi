@@ -24,18 +24,13 @@ In **Sessions & tools → Subagents**, select an agent, enter its task, and clic
 
 Workflow agents appear in separate tabs while pi-graph runs them. Their launcher records JSON events even though pi-graph disables native child session persistence. Parent relationships and workflow run IDs are stored durably. Closing a conversation tab is a display action; it does not stop execution.
 
-## Background processes and terminals
+## Background processes and interactive shells
 
 The model can launch a background script using the upstream `process` tool. Its output appears in a terminal-style tab, its state appears in the execution panel, and completion is recorded once. The primary conversation remains available while it runs. **Stop** in Sessions & tools cancels the corresponding job.
 
-**Open terminal** starts a real persistent Bash PTY using pi-interactive-shell's headless background dispatch. The terminal input form sends a line; environment variables and current directory survive successive input requests. For example:
+The agent can use pi-interactive-shell's `interactive_shell` tool to start a command in a persistent pseudo-terminal (PTY), send input, read output, and stop the session. Shell environment variables and the working directory persist within the session. This supports interactive programs and SSH clients where installed and configured.
 
-```bash
-export EXAMPLE=retained
-printf '%s\n' "$EXAMPLE"
-```
-
-**Close terminal** kills that PTY. Quiet auto-close is disabled. Output polling uses the upstream supported five-second minimum query interval; input is sent immediately. In build mode, the model can use the same upstream tool to start a supported persistent command, including an SSH client where installed and configured. Automated tests cover local Bash PTYs; remote SSH authentication and networking require separate deployment validation.
+The EAA host launches these sessions in headless background dispatch mode and disables quiet auto-close. Output polling uses the upstream supported five-second minimum query interval. Automated tests cover local Bash PTYs; remote SSH authentication and networking require separate deployment validation.
 
 ## Plan mode
 

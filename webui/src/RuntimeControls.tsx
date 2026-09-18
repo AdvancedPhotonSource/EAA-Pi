@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MessageCircle, Plus, Play, RotateCcw, GitBranch, Terminal, Users, FileText, RefreshCw } from "lucide-react";
+import { MessageCircle, Plus, Play, RotateCcw, GitBranch, Users, FileText, RefreshCw } from "lucide-react";
 import type { ToolExecutionQueueEntry } from "./types";
 
 async function post(path: string, body: unknown = {}) {
@@ -75,7 +75,6 @@ export function RuntimeControls({ planMode, jobs, onChanged, onExpandedChange }:
         <label>Task<textarea aria-label="Workflow task" rows={3} value={task} onChange={event => setTask(event.target.value)} /></label>
         <div className="eaa-runtime-actions">
           <button disabled={planMode || !workflow} onClick={() => void run("/api/workflows/run", { input: task, workflow })}><Play size={14} />Run workflow</button>
-          <button disabled={planMode} onClick={() => void run("/api/terminals")}><Terminal size={14} />Open terminal</button>
         </div>
       </section>
       <section className="eaa-runtime-section" aria-label="Recent runs">

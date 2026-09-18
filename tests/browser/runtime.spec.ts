@@ -34,7 +34,8 @@ test("EAA chat streams once, survives reload, and exposes runtime controls", asy
   await expect(page.getByRole("textbox", { name: "Workflow task" })).toHaveValue("Three example measurements");
   await page.getByRole("button", { name: "Launch subagent", exact: true }).click();
   await expect.poll(async () => (await (await request.get("/api/state")).json()).conversations.some((c: any) => c.kind === "subagent" && c.messages.length), { timeout: 60000 }).toBeTruthy();
-  await page.getByRole("button", { name: "Open terminal", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Open terminal", exact: true })).toHaveCount(0);
+  expect((await request.post("/api/terminals", { data: {} })).status()).toBe(201);
   await page.getByRole("button", { name: "Collapse sessions and tools" }).click();
   await expect(page.getByRole("textbox", { name: "Terminal input" })).toBeVisible();
   await page.getByRole("textbox", { name: "Terminal input" }).fill("printf browser-terminal-ok");

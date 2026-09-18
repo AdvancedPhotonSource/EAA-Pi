@@ -21,7 +21,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 The shortcut works from any directory. If needed, add the `export` line to `~/.bashrc` to keep it available in new terminals. See [command setup](docs/installation.md#enable-the-eaa-pi-command) for tarball installations and removing the link.
 
-Open **http://127.0.0.1:8010**. The demo uses a local deterministic model endpoint and simulated MCP instrument; no provider credentials are required. Try `hello`, `request approval`, `run background job`, `review in background`, or `open terminal`. Use **Sessions & tools → select toy → enter a task → Run workflow** to exercise generator → reviewer → image creation.
+Open **http://127.0.0.1:8010**. The demo uses a local deterministic model endpoint and simulated MCP instrument; no provider credentials are required. Try `hello`, `request approval`, `run background job`, or `review in background`. Use **Sessions & tools → select toy → enter a task → Run workflow** to exercise generator → reviewer → image creation.
 
 For a real provider, initialize an EAA workspace:
 
@@ -55,7 +55,7 @@ Replace `argo` and `gpt55` with a provider/model configured in `.pi-experiment-o
 
 - [Installation, packaging, upgrades, and uninstall](docs/installation.md)
 - [Configuration, authentication, and MCP](docs/configuration.md)
-- [Frontend, sessions, jobs, terminals, and recovery](docs/usage.md)
+- [Frontend, sessions, jobs, interactive shells, and recovery](docs/usage.md)
 - [Workflow authoring and toy example](docs/workflows.md)
 - [Containers and execution policy](docs/security.md)
 - [Repository separation and bundle upgrades](docs/repositories.md)
