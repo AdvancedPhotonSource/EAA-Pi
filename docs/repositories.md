@@ -13,7 +13,7 @@
 
 The bundle API exposes resource paths, executables, workspace setup, and Pi-loadable upstream wrapper APIs. EAA replaces the policy, MCP, terminal, and archive entries, and wraps CodeMode when the bundle includes it to track background cells in the execution queue. The graph child recorder remains an EAA adapter because it creates frontend conversation relationships. Native terminal behavior is retained in the standalone bundle.
 
-EAA includes `vendor/pi-experiment-ops-0.2.0.tgz` and declares it as a `file:vendor/...` dependency. This is a release artifact with integrity recorded by npm, not a link to another checkout. npm bundles the installed dependency and its runtime dependencies in the application tarball. The prepack hook gives installed hard-linked files independent inodes, preserving their bytes and modes, so npm can extract bundled executables reliably. Docker builds copy the vendored release before installing. Both source and tarball installation work when the separate bundle source repository is absent.
+EAA includes `vendor/pi-experiment-ops-0.3.0.tgz` and declares it as a `file:vendor/...` dependency. This is a release artifact with integrity recorded by npm, not a link to another checkout. npm bundles the installed dependency and its runtime dependencies in the application tarball. The prepack hook gives installed hard-linked files independent inodes, preserving their bytes and modes, so npm can extract bundled executables reliably. Docker builds copy the vendored release before installing. Both source and tarball installation work when the separate bundle source repository is absent.
 
 ## Developing both repositories together
 
