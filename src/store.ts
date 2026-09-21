@@ -28,7 +28,18 @@ export interface Conversation {
   terminated?: boolean;
   messages: Message[];
   terminal?: Terminal;
-  pending_approval?: Record<string, unknown> | null;
+  pending_approval?: PendingApproval | null;
+}
+export type ApprovalDecision = "allow_once" | "allow_session" | "deny";
+export interface PendingApproval {
+  id: string;
+  conversation_id: string;
+  tool_name: string;
+  arguments: { message: string };
+  options: { decision: ApprovalDecision; label: string }[];
+  requested_at: string;
+  expires_at: string;
+  timeout_seconds: number;
 }
 export interface Job {
   job_id: string;
@@ -48,6 +59,7 @@ export interface Snapshot {
   interrupt_requested: boolean;
   plan_mode: boolean;
   plan_mode_available: boolean;
+  permission_auto_allow: boolean;
   tool_execution_queue: Job[];
   message_queue: Job[];
   session_id: string;

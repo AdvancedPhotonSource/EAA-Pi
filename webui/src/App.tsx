@@ -21,6 +21,7 @@ import {
 import { escapeHtml, renderMarkdown } from "./markdown";
 import type {
   PendingApproval,
+  ApprovalDecision,
   RuntimeConversation,
   RuntimeLogEntry,
   RuntimeTerminal,
@@ -68,6 +69,7 @@ const defaultConfig: WebUIConfig = {
     send: "/api/input",
     interrupt: "/api/interrupt",
     approval: "/api/approval",
+    permissions: "/api/permissions",
     upload: "/api/upload-image",
     skillCatalog: "/api/skill-catalog",
     toolSchemas: "/api/tool-schemas",
@@ -333,7 +335,7 @@ function MessageView({
   index: number;
   message: WebUIMessage;
   onImage: (src: string) => void;
-  onApproval: (approved: boolean, approvalId?: string) => Promise<void>;
+  onApproval: (decision: ApprovalDecision, approvalId?: string) => Promise<void>;
 }) {
   const [approvalSubmitted, setApprovalSubmitted] = useState(false);
   const [approvalRemainingMs, setApprovalRemainingMs] = useState<number | null>(null);
@@ -381,10 +383,10 @@ function MessageView({
     return () => window.clearInterval(interval);
   }, [approvalExpiresAt, message]);
 
-  const submitApproval = async (approved: boolean) => {
+  const submitApproval = async (decision: ApprovalDecision) => {
     if (approvalSubmitted || approvalExpired) return;
     setApprovalSubmitted(true);
-    await onApproval(approved, message.approval_id);
+    await onApproval(decision, message.approval_id);
   };
 
   return (
@@ -431,22 +433,17 @@ function MessageView({
               </div>
             ) : null}
             <div className="eaa-approval-actions">
-              <button
-                className="eaa-approval-button eaa-approval-yes"
-                disabled={approvalSubmitted || approvalExpired}
-                type="button"
-                onClick={() => submitApproval(true)}
-              >
-                Yes
-              </button>
-              <button
-                className="eaa-approval-button eaa-approval-no"
-                disabled={approvalSubmitted || approvalExpired}
-                type="button"
-                onClick={() => submitApproval(false)}
-              >
-                No
-              </button>
+              {(message.approval_options?.length ? message.approval_options : [{ decision: "allow_once" as const, label: "Allow" }, { decision: "deny" as const, label: "Deny" }]).map(option => (
+                <button
+                  className={`eaa-approval-button ${option.decision === "deny" ? "eaa-approval-no" : "eaa-approval-yes"}`}
+                  disabled={approvalSubmitted || approvalExpired}
+                  key={option.decision}
+                  type="button"
+                  onClick={() => submitApproval(option.decision)}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
           </>
         ) : null}
@@ -609,7 +606,7 @@ function ToolsView({
   );
 }
 
-function SettingsView({ title, onTitleChange }: { title: string; onTitleChange: (title: string) => void }) {
+function SettingsView({ title, onTitleChange, autoAllow, onAutoAllowChange }: { title: string; onTitleChange: (title: string) => void; autoAllow: boolean; onAutoAllowChange: (enabled: boolean) => void }) {
   return (
     <section className="eaa-view eaa-settings-view" aria-label="Settings">
       <div className="eaa-view-header">
@@ -618,6 +615,13 @@ function SettingsView({ title, onTitleChange }: { title: string; onTitleChange: 
       <label className="eaa-setting-field">
         <span>WebUI title</span>
         <input value={title} onChange={(event) => onTitleChange(event.target.value)} />
+      </label>
+      <label className="eaa-setting-toggle">
+        <input type="checkbox" role="switch" checked={autoAllow} onChange={(event) => onAutoAllowChange(event.target.checked)} />
+        <span>
+          <strong>Auto-allow tool requests</strong>
+          <small>Allow unmatched requests for this session. Explicit deny rules still apply.</small>
+        </span>
       </label>
     </section>
   );
@@ -767,6 +771,7 @@ function App() {
   const [interruptRequested, setInterruptRequested] = useState(false);
   const [planMode, setPlanMode] = useState(false);
   const [planModeAvailable, setPlanModeAvailable] = useState(false);
+  const [permissionAutoAllow, setPermissionAutoAllow] = useState(false);
   const [infoMessage, setInfoMessage] = useState<{ id: number; text: string } | null>(null);
   const [content, setContent] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -1175,6 +1180,7 @@ function App() {
       setInterruptRequested(Boolean(payload.interrupt_requested));
       if (typeof payload.plan_mode === "boolean") setPlanMode(payload.plan_mode);
       if (typeof payload.plan_mode_available === "boolean") setPlanModeAvailable(payload.plan_mode_available);
+      if (typeof payload.permission_auto_allow === "boolean") setPermissionAutoAllow(payload.permission_auto_allow);
       if (payload.interrupt_requested) setConnection("Interrupt requested");
       const conversation = (payload as RuntimeSnapshot & { conversation?: RuntimeConversation }).conversation;
       if (conversation) upsertConversation(conversation);
@@ -1201,6 +1207,7 @@ function App() {
             approval_requested_at: payload.requested_at,
             approval_expires_at: payload.expires_at,
             approval_timeout_seconds: payload.timeout_seconds,
+            approval_options: payload.options,
           },
         ],
         conversationId,
@@ -1439,12 +1446,23 @@ function App() {
     return () => source.close();
   }, [applyStatus, mergeMessages, renderApprovalRequest, upsertConversation]);
 
-  const submitApproval = async (approved: boolean, conversationId = activeConversationId, approvalId?: string) => {
+  const submitApproval = async (decision: ApprovalDecision, conversationId = activeConversationId, approvalId?: string) => {
     await fetch(config.routes.approval, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversation_id: conversationId, approved, approval_id: approvalId ?? conversations.find(c => c.id === conversationId)?.pending_approval?.id }),
+      body: JSON.stringify({ conversation_id: conversationId, decision, approval_id: approvalId ?? conversations.find(c => c.id === conversationId)?.pending_approval?.id }),
     });
+  };
+
+  const changePermissionAutoAllow = async (enabled: boolean) => {
+    setPermissionAutoAllow(enabled);
+    const response = await fetch(config.routes.permissions, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auto_allow: enabled }) });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setPermissionAutoAllow(!enabled);
+      showInfoMessage(result.message || "Could not change tool approval mode");
+    }
+    else setPermissionAutoAllow(Boolean(result.auto_allow));
   };
 
   const closeConversation = (conversationId: string) => {
@@ -1502,7 +1520,7 @@ function App() {
     if (!trimmed) return;
     const activeApprovalPending = Boolean(activeConversation?.pending_approval) || status === "waiting_for_approval";
     if (activeApprovalPending && ["y", "yes", "n", "no"].includes(trimmed.toLowerCase())) {
-      await submitApproval(["y", "yes"].includes(trimmed.toLowerCase()), activeConversationId);
+      await submitApproval(["y", "yes"].includes(trimmed.toLowerCase()) ? "allow_once" : "deny", activeConversationId);
       setContent("");
       setSuggestionsOpen(false);
       return;
@@ -1909,7 +1927,7 @@ function App() {
             onReconnectMcp={reconnectMcpServer}
           />
         ) : (
-          <SettingsView title={uiTitle} onTitleChange={setUiTitle} />
+          <SettingsView title={uiTitle} onTitleChange={setUiTitle} autoAllow={permissionAutoAllow} onAutoAllowChange={(enabled) => void changePermissionAutoAllow(enabled)} />
         )}
       </div>
       {helpOpen ? <HelpDialog onClose={() => setHelpOpen(false)} /> : null}

@@ -86,6 +86,19 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     assert.ok(messages.some(m => m.content === "Demo reply: hello streaming"));
     assert.equal(new Set(messages.map(m => m.id)).size, messages.length);
   });
+  await t.test("permission gate remembers a tool for the session and supports session auto-allow", async () => {
+    writeFileSync(join(workspace, "permission-fixture.txt"), "approved read");
+    await request("/api/input", { content: "read permission-fixture.txt" }, 201);
+    const approval = await wait(() => runtime.snapshot.conversations[0].pending_approval);
+    assert.deepEqual(approval.options.map(option => option.decision), ["allow_once", "allow_session", "deny"]);
+    await request("/api/approval", { approval_id: approval.id, decision: "allow_session" });
+    await idle();
+    assert.ok(runtime.snapshot.conversations[0].messages.some(message => message.role === "tool" && /approved read/.test(message.content)));
+    await prompt("read permission-fixture.txt");
+    assert.equal(runtime.snapshot.conversations[0].pending_approval, null);
+    assert.deepEqual(await request("/api/permissions", { auto_allow: true }), { auto_allow: true });
+    assert.equal(runtime.snapshot.permission_auto_allow, true);
+  });
   await t.test("actual MCP tool and image blocks", async () => {
     await request("/api/input", { content: 'fixture-tool {"name":"toy_image","arguments":{}}' }, 201);
     const mcpApproval = await wait(() => runtime.snapshot.conversations[0].pending_approval);

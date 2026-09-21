@@ -5,6 +5,7 @@ export type WebUIRoutes = {
   send: string;
   interrupt: string;
   approval: string;
+  permissions: string;
   upload: string;
   skillCatalog: string;
   toolSchemas: string;
@@ -32,6 +33,7 @@ export type WebUIMessage = {
   approval_requested_at?: string;
   approval_expires_at?: string;
   approval_timeout_seconds?: number;
+  approval_options?: ApprovalOption[];
 };
 
 export type RuntimeLogEntry = {
@@ -76,7 +78,11 @@ export type RuntimeSnapshot = {
   message_queue?: MessageQueueEntry[];
   plan_mode?: boolean;
   plan_mode_available?: boolean;
+  permission_auto_allow?: boolean;
 };
+
+export type ApprovalDecision = "allow_once" | "allow_session" | "deny";
+export type ApprovalOption = { decision: ApprovalDecision; label: string };
 
 export type ToolExecutionQueueEntry = {
   job_id: string;
@@ -105,6 +111,7 @@ export type PendingApproval = {
   requested_at?: string;
   expires_at?: string;
   timeout_seconds?: number;
+  options?: ApprovalOption[];
 };
 
 export type RuntimeConversation = {

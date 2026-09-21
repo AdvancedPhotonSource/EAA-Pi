@@ -8,7 +8,9 @@ Enter a message in the composer. Pi streams replace the same message by stable I
 
 Use the attachment button or paste an image from the clipboard into the composer to upload PNG, JPEG, GIF, or WebP data. Uploaded bytes become durable gallery artifacts and Pi image blocks. Images returned by MCP tools are also registered in the gallery. The image endpoint serves only registered artifacts; arbitrary filesystem paths are rejected.
 
-Approval cards offer approve/deny. Typing `yes` or `no` while a primary approval is pending also answers it. Interrupt and shutdown deny pending requests. An approval is a tool-level confirmation, not an operating-system sandbox.
+Approval cards offer **Allow once**, **Allow for session**, and **Deny**. A session grant remembers the matching tool policy until that Pi session ends. Typing `yes` or `no` while a primary approval is pending maps to allow once or deny. Use **Settings → Auto-allow tool requests** to allow unmatched calls for the current WebUI session; explicit deny rules still apply. In the TUI, use `/permissions auto`, `/permissions ask`, or `/permissions status`. Pattern rules belong in `.pi-experiment-ops/agent/pi-permissions.jsonc`.
+
+The gate covers normal Pi tool invocations, including direct MCP tools. Accepting `codemode_execute` authorizes the cell; tool calls made inside that accepted CodeMode cell are not prompted separately. Interrupt and shutdown deny pending requests. This approval policy is not an operating-system sandbox.
 
 The supported command suggestions are `/mode plan`, `/mode build`, `/skill:name`, and `/mcp`. Pi's other installed extension commands can be entered in build mode when compatible with a headless host. Use browser session controls for new/resume/branch, so the host can rebind subscriptions and policy settings.
 

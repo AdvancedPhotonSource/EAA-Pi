@@ -7,10 +7,15 @@ import {
   type AgentSession, type EventBus, type ExtensionContext,
 } from "pi-experiment-ops/sdk";
 import { agentDir, dataDir, sessionDir, migrateLegacySessions, adapterResources, configureEnvironment, loadConfig, type Config } from "./config.js";
-import { Store, id, timestamp, type Snapshot, type Conversation, type Message } from "./store.js";
+import { Store, id, timestamp, type Snapshot, type Conversation, type Message, type PendingApproval, type ApprovalDecision } from "./store.js";
 
 export class HttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
 const readers = ["read", "grep", "find", "ls", "pi_modes_plan_complete"];
+type PermissionRuntime = {
+  getYoloMode(): boolean;
+  setYoloMode(enabled: boolean, options?: { persist?: boolean; source?: string }): { yoloMode: boolean; error?: string };
+};
+type ApprovalRequest = { resolve: (value: string | undefined) => void; timer: NodeJS.Timeout; pending: PendingApproval; options: string[] };
 export class Runtime extends EventEmitter {
   session!: AgentSession;
   bus!: EventBus;
@@ -29,7 +34,8 @@ export class Runtime extends EventEmitter {
   private traceCount = 0;
   private poll?: NodeJS.Timeout;
   private offsets = new Map<string, number>();
-  private approvals = new Map<string, { resolve: (value: boolean) => void; timer: NodeJS.Timeout }>();
+  private approvals = new Map<string, ApprovalRequest>();
+  private approvalQueue: string[] = [];
   private unsubscribe?: () => void;
   private subagentIds = new Set<string>();
   private terminalIds = new Set<string>();
@@ -60,7 +66,7 @@ export class Runtime extends EventEmitter {
     this.snapshot = this.store.load(manager.getSessionId()) ?? {
       conversations: [{ id: "primary", label: "Main Agent", kind: "primary", messages: [] }], logs: [],
       status: "waiting_for_input", input_requested: true, interrupt_requested: false, plan_mode: false,
-      plan_mode_available: true, tool_execution_queue: [], message_queue: [], session_id: manager.getSessionId(), sequence: 0,
+      plan_mode_available: true, permission_auto_allow: false, tool_execution_queue: [], message_queue: [], session_id: manager.getSessionId(), sequence: 0,
       capabilities: { sessions: true, children: true, workflows: true, terminal_input: true, mcp_server_logs: false },
     };
     for (const conversation of this.snapshot.conversations) {
@@ -107,11 +113,12 @@ export class Runtime extends EventEmitter {
       uiContext: { ...ui,
         notify: (message, level = "info") => this.log("extension", message, level),
         confirm: (title, message) => this.confirm(title, message),
-        select: async (title, options) => await this.confirm(title, `Choose ${options[0]}?`) ? options[0] : options.find(option => /deny|cancel|stay/i.test(option)),
+        select: (title, options) => this.select(title, options),
       },
       onError: error => this.log("extension", JSON.stringify(error), "error"),
     });
     this.buildTools = this.session.getActiveToolNames();
+    this.snapshot.permission_auto_allow = this.permissionAutoAllow();
     const wasPlan = this.snapshot.plan_mode;
     if (wasPlan) await this.applyMode(true);
     this.conversation("primary").messages = this.session.messages.map(message => this.convert(message));
@@ -126,6 +133,7 @@ export class Runtime extends EventEmitter {
       this.context = ctx;
       ctx.ui.notify = (message: string, level: string = "info") => this.log("extension", message, level);
       ctx.ui.confirm = (title: string, message: string) => this.confirm(title, message);
+      ctx.ui.select = (title: string, options: string[]) => this.select(title, options);
       ctx.ui.setStatus = (_key: string, _value: string) => {};
     });
     this.bus.on("subagent:async-complete", (event: any) => {
@@ -309,31 +317,78 @@ export class Runtime extends EventEmitter {
   async interrupt() {
     this.snapshot.interrupt_requested = true;
     this.publish("interrupt.requested", this.snapshot);
-    for (const approvalId of this.approvals.keys()) this.approve(approvalId, false);
+    for (const approvalId of [...this.approvals.keys()]) this.approve(approvalId, "deny");
     await this.session.abort();
     this.session.abortBash();
     this.snapshot.interrupt_requested = false;
     this.publish("interrupt.cleared", this.snapshot);
   }
-  confirm(title: string, message: string): Promise<boolean> {
-    const approvalId = id();
-    const pending = { id: approvalId, conversation_id: "primary", tool_name: title, arguments: { message }, requested_at: timestamp(), timeout_seconds: 120 };
-    this.conversation("primary").pending_approval = pending;
+  private permissionRuntime(): PermissionRuntime | undefined {
+    const globals = globalThis as typeof globalThis & { __piExperimentOpsPermissions?: PermissionRuntime; __piPermissionSystem?: PermissionRuntime };
+    return globals.__piExperimentOpsPermissions ?? globals.__piPermissionSystem;
+  }
+  permissionAutoAllow(): boolean { return this.permissionRuntime()?.getYoloMode() ?? false; }
+  setPermissionAutoAllow(enabled: boolean) {
+    const result = this.permissionRuntime()?.setYoloMode(enabled, { persist: false, source: "eaa-webui" });
+    if (!result) throw new HttpError(503, "Permission system is unavailable");
+    if (result.error) throw new HttpError(500, result.error);
+    this.snapshot.permission_auto_allow = result.yoloMode;
+    this.publish("permissions.changed", { permission_auto_allow: result.yoloMode });
+    return { auto_allow: result.yoloMode };
+  }
+  private approvalOptions(options: string[]): PendingApproval["options"] {
+    const mapped: PendingApproval["options"] = [];
+    if (options.length) mapped.push({ decision: "allow_once", label: /allow once/i.test(options[0]) ? "Allow once" : options[0] });
+    if (options.some(option => /allow always|allow for session/i.test(option))) mapped.push({ decision: "allow_session", label: "Allow for session" });
+    if (options.some(option => /reject|deny|cancel|no/i.test(option))) mapped.push({ decision: "deny", label: "Deny" });
+    return mapped;
+  }
+  private resolveApprovalOption(options: string[], decision: ApprovalDecision | boolean): string | undefined {
+    if (decision === true) return options[0];
+    if (decision === false || decision === "deny") return options.find(option => /^(reject|deny|cancel|no)$/i.test(option)) ?? options.find(option => /reject|deny|cancel|no/i.test(option));
+    if (decision === "allow_session") return options.find(option => /allow always|allow for session/i.test(option));
+    return options.find(option => /allow once/i.test(option)) ?? options[0];
+  }
+  private showApproval(approvalId: string) {
+    const request = this.approvals.get(approvalId);
+    if (!request) return;
+    this.conversation("primary").pending_approval = request.pending;
     this.setStatus("waiting_for_approval");
-    this.publish("approval.requested", pending);
+    this.publish("approval.requested", request.pending);
+  }
+  private requestApproval(title: string, message: string, options: string[]): Promise<string | undefined> {
+    const approvalId = id();
+    const timeoutSeconds = 120;
+    const requestedAt = timestamp();
+    const pending: PendingApproval = { id: approvalId, conversation_id: "primary", tool_name: title, arguments: { message }, options: this.approvalOptions(options), requested_at: requestedAt, expires_at: new Date(Date.now() + timeoutSeconds * 1000).toISOString(), timeout_seconds: timeoutSeconds };
     return new Promise(resolve => {
-      const timer = setTimeout(() => this.approve(approvalId, false), 120_000);
-      this.approvals.set(approvalId, { resolve, timer });
+      const timer = setTimeout(() => this.approve(approvalId, "deny"), timeoutSeconds * 1000);
+      this.approvals.set(approvalId, { resolve, timer, pending, options });
+      this.approvalQueue.push(approvalId);
+      if (this.approvalQueue.length === 1) this.showApproval(approvalId);
     });
   }
-  approve(approvalId: string, approved: boolean) {
+  async confirm(title: string, message: string): Promise<boolean> {
+    return (await this.requestApproval(title, message, ["Allow", "Deny"])) === "Allow";
+  }
+  select(title: string, options: string[]): Promise<string | undefined> {
+    const [heading, ...lines] = title.split("\n");
+    return this.requestApproval(heading || "Permission Required", lines.join("\n") || title, options);
+  }
+  approve(approvalId: string, decision: ApprovalDecision | boolean) {
     const request = this.approvals.get(approvalId);
     if (!request) throw new HttpError(409, "No matching approval request is pending");
     clearTimeout(request.timer);
     this.approvals.delete(approvalId);
-    this.conversation("primary").pending_approval = null;
-    request.resolve(approved);
-    this.setStatus(this.busy || this.session.isStreaming ? "processing" : "waiting_for_input");
+    const index = this.approvalQueue.indexOf(approvalId);
+    const active = index === 0;
+    if (index >= 0) this.approvalQueue.splice(index, 1);
+    request.resolve(this.resolveApprovalOption(request.options, decision));
+    if (active) {
+      this.conversation("primary").pending_approval = null;
+      if (this.approvalQueue.length) this.showApproval(this.approvalQueue[0]);
+      else this.setStatus(this.busy || this.session.isStreaming ? "processing" : "waiting_for_input");
+    }
     this.publish("snapshot", this.snapshot);
   }
   rpc(method: string, params: Record<string, unknown> = {}): Promise<any> {
@@ -533,7 +588,7 @@ export class Runtime extends EventEmitter {
   }
   async stopSession() {
     clearInterval(this.poll);
-    for (const approvalId of this.approvals.keys()) this.approve(approvalId, false);
+    for (const approvalId of [...this.approvals.keys()]) this.approve(approvalId, "deny");
     for (const runId of this.subagentIds) {
       try { await this.rpc("stop", { id: runId }); } catch { /* Already finished. */ }
     }

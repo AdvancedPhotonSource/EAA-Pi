@@ -1414,6 +1414,28 @@ body.eaa-resizing-rows * {
   padding: 0 12px;
 }
 
+.eaa-setting-toggle {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  max-width: 520px;
+}
+
+.eaa-setting-toggle input {
+  margin-top: 3px;
+}
+
+.eaa-setting-toggle span {
+  display: grid;
+  gap: 4px;
+}
+
+.eaa-setting-toggle small {
+  color: #64748b;
+  line-height: 1.45;
+}
+
 .eaa-browser-image-preview,
 .eaa-modal-backdrop {
   align-items: center;

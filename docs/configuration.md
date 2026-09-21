@@ -12,6 +12,8 @@
 | `.pi-experiment-ops/agent/models.json` | Native custom provider definitions |
 | `.pi-experiment-ops/agent/interactive-shell.json` | PTY output query interval (five seconds) |
 | `.pi-experiment-ops/agent/modes.config.json` | Build/plan mode configuration |
+| `.pi-experiment-ops/agent/permission-system.json` | Permission extension settings and default session mode |
+| `.pi-experiment-ops/agent/pi-permissions.jsonc` | Pattern-based tool, command, MCP, skill, and special-operation policies |
 | `.pi-experiment-ops/agent/sessions/<encoded-workspace>/` | Authoritative primary Pi JSONL sessions shared with the experiment-ops TUI |
 | `.eaa-pi/agent/children/` | Durable Pi-format child transcript projections |
 | `.eaa-pi/children/` | Captured child JSON events, grouped by primary session |
@@ -85,8 +87,8 @@ Edit `.pi/mcp.json`, then restart the server:
 }
 ```
 
-The bridge loads this configuration through upstream `createMcpAdapter`. Individual tools appear in the tool viewer; the proxy and script tools also remain available in build mode. The default server prefix permits attribution and reconnect controls. Host-tool discovery is disabled. For HTTP authentication, use upstream MCP adapter configuration/OAuth support; keep secrets in server-side configuration.
+The bridge loads this configuration through upstream `createMcpAdapter`. Individual tools appear in the tool viewer, and the MCP proxy remains available in build mode. `mcpScript` is disabled by default so CodeMode is the single scripted tool-call interface. The default server prefix permits attribution and reconnect controls. Host-tool discovery is disabled. For HTTP authentication, use upstream MCP adapter configuration/OAuth support; keep secrets in server-side configuration.
 
-`approveTools` supports upstream booleans and allowlisted tool-name patterns. Browser confirmation grants **Allow once** or **Deny**; session-wide grants are available through Pi's native interfaces. Pending approvals expire after 120 seconds and interruption denies them. The WebUI tool viewer provides reconnect for configured, prefixed tools while the runtime is idle. Changing the configuration file requires restarting this factory-based host.
+`approveTools` supports upstream booleans and allowlisted tool-name patterns as an optional, independent MCP-adapter gate. The generated configuration omits it, leaving the general permission system as the default gate for direct MCP tools. If users enable `approveTools`, an MCP call must pass both layers. Pending approvals expire after 120 seconds and interruption denies them. The WebUI tool viewer provides reconnect for configured, prefixed tools while the runtime is idle. Changing the MCP configuration requires restarting this factory-based host.
 
 The Logs pane shows connection snapshots, metadata-only protocol traces, and tool execution events. Complete MCP server logging/progress payloads are unavailable through the inspected public interfaces. No backend fork or internal event interception is used to claim otherwise. Traces intentionally omit argument/result payloads; model-visible tool results appear in conversations. See [pi-mcp-adapter](https://github.com/nicobailon/pi-mcp-adapter) for the upstream configuration contract.

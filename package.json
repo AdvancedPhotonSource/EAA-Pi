@@ -37,7 +37,7 @@
     "prepack": "node scripts/prepare-pack.mjs"
   },
   "dependencies": {
-    "pi-experiment-ops": "file:vendor/pi-experiment-ops-0.3.0.tgz",
+    "pi-experiment-ops": "file:vendor/pi-experiment-ops-0.4.0.tgz",
     "typebox": "1.3.7"
   },
   "bundledDependencies": [

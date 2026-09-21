@@ -78,9 +78,14 @@ export async function startServer(runtime: Runtime, port = runtime.config.port, 
       }
       if (route === "/api/interrupt") { await runtime.interrupt(); return json({ ok: true }); }
       if (route === "/api/mode") { if (typeof body.plan_mode !== "boolean") throw new HttpError(400, "plan_mode must be boolean"); await runtime.mode(body.plan_mode); return json({ ok: true }); }
+      if (route === "/api/permissions") {
+        if (typeof body.auto_allow !== "boolean") throw new HttpError(400, "auto_allow must be boolean");
+        return json(runtime.setPermissionAutoAllow(body.auto_allow));
+      }
       if (route === "/api/approval") {
-        if (typeof body.approved !== "boolean") throw new HttpError(400, "approved must be boolean");
-        runtime.approve(String(body.approval_id || ""), body.approved); return json({ ok: true });
+        const decision = body.decision ?? body.approved;
+        if (typeof decision !== "boolean" && !["allow_once", "allow_session", "deny"].includes(decision)) throw new HttpError(400, "decision must be allow_once, allow_session, or deny");
+        runtime.approve(String(body.approval_id || ""), decision); return json({ ok: true });
       }
       if (route === "/api/upload-image") {
         const match = String(body.image_data || "").match(/^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\s]+)$/);
