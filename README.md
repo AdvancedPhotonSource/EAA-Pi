@@ -8,10 +8,9 @@ Requirements: native Linux, Node.js **22.19 or newer**, Git, Bash, and [uv](http
 
 ```bash
 bash scripts/install.sh /tmp/my-eaa-demo
-node bin/eaa-pi.mjs demo --workspace /tmp/my-eaa-demo
 ```
 
-To use `eaa-pi` in place of `node bin/eaa-pi.mjs`, run this once from the repository root:
+Enable the `eaa-pi` command by running this once from the repository root:
 
 ```bash
 mkdir -p "$HOME/.local/bin"
@@ -20,6 +19,12 @@ export PATH="$HOME/.local/bin:$PATH"
 ```
 
 The shortcut works from any directory. If needed, add the `export` line to `~/.bashrc` to keep it available in new terminals. See [command setup](docs/installation.md#enable-the-eaa-pi-command) for tarball installations and removing the link.
+
+Start the demo:
+
+```bash
+eaa-pi demo --workspace /tmp/my-eaa-demo
+```
 
 Open **http://127.0.0.1:8010**. The demo uses a local deterministic model endpoint and simulated MCP instrument; no provider credentials are required. Try `hello`, `request approval`, `run background job`, or `review in background`. Use **Sessions & tools → select toy → enter a task → Run workflow** to exercise generator → reviewer → image creation.
 
