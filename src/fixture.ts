@@ -1,15 +1,5 @@
 import { createServer, type IncomingMessage } from "node:http";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-
-export function configureDemoWorkflow(workspace: string) {
-  const definition = join(workspace, "workflows/toy/steps.yaml");
-  if (!existsSync(definition)) return;
-  const source = readFileSync(definition, "utf8");
-  if (/^model: local-test\/toy$/m.test(source)) writeFileSync(definition, source.replace(/^model: local-test\/toy$/m, "model: eaa-demo/toy"));
-}
-
 export async function jsonBody(request: IncomingMessage, limit = 12 * 1024 * 1024): Promise<any> {
   const parts: Buffer[] = [];
   let size = 0;
@@ -49,6 +39,7 @@ export async function startModelFixture() {
       else if (text === "run background job" && tools.includes("process")) call = { name: "process", args: { action: "start", name: "toy-job", command: "sleep 2; printf 'toy-job finished\\n'" } };
       else if (text === "open terminal" && tools.includes("interactive_shell")) call = { name: "interactive_shell", args: { command: "bash --noprofile --norc", mode: "dispatch", background: true, handsFree: { autoExitOnQuiet: false } } };
       else if (text === "request approval" && tools.includes("eaa_confirm")) call = { name: "eaa_confirm", args: { message: "Approve the toy action?" } };
+      if (!afterTool && tools.includes("structured_output") && /PI_OPS_TOY_(GENERATE|REVIEW)/.test(text)) call = { name: "structured_output", args: { value: JSON.parse(output) } };
       if (Array.isArray(lastUser?.content) && lastUser.content.some((b: any) => b.type === "image_url")) output = "Image received by the local fixture.";
       res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
       const completionId = "chatcmpl-" + randomUUID();

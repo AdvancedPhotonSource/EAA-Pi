@@ -6,14 +6,14 @@
 |---|---|
 | Pi/community dependency versions and standard Pi resource manifest | Pi SDK host and HTTP/SSE API |
 | Native terminal extension entrypoints | Browser-specific policy, MCP, archive and terminal wrappers |
-| Python lock, runtime installer, graph executable discovery | Application installer delegates Python provisioning to the bundle |
-| Generic toy graph and workspace initialization | Browser launch/resume controls and child transcript capture |
+| Python lock, runtime installer, Pi executable discovery | Application installer delegates Python provisioning to the bundle |
+| Generic toy workflow and workspace initialization | Browser launch/resume controls and child transcript capture |
 | Pi native sessions and archive integration | Adapter SQLite, gallery, relationships and completion deduplication |
-| CLI and independent Pi/graph acceptance | React frontend, static notices, browser/integration/container acceptance |
+| CLI and independent Pi/workflow acceptance | React frontend, static notices, browser/integration/container acceptance |
 
-The bundle API exposes resource paths, executables, workspace setup, and Pi-loadable upstream wrapper APIs. EAA replaces the policy, MCP, terminal, and archive entries, and wraps CodeMode when the bundle includes it to track background cells in the execution queue. The graph child recorder remains an EAA adapter because it creates frontend conversation relationships. Native terminal behavior is retained in the standalone bundle.
+The bundle API exposes resource paths, executables, workspace setup, and Pi-loadable upstream wrapper APIs. EAA replaces the policy, MCP, terminal, and archive entries, and wraps CodeMode when the bundle includes it to track background cells in the execution queue. The subagent child observer remains an EAA adapter because it creates frontend conversation relationships. Native terminal behavior is retained in the standalone bundle.
 
-EAA includes `vendor/pi-experiment-ops-0.4.0.tgz` and declares it as a `file:vendor/...` dependency. This is a release artifact with integrity recorded by npm, not a link to another checkout. npm bundles the installed dependency and its runtime dependencies in the application tarball. The prepack hook gives installed hard-linked files independent inodes, preserving their bytes and modes, so npm can extract bundled executables reliably. Docker builds copy the vendored release before installing. Both source and tarball installation work when the separate bundle source repository is absent.
+EAA includes `vendor/pi-experiment-ops-0.5.0.tgz` and declares it as a `file:vendor/...` dependency. This is a release artifact with integrity recorded by npm, not a link to another checkout. npm bundles the installed dependency and its runtime dependencies in the application tarball. The prepack hook gives installed hard-linked files independent inodes, preserving their bytes and modes, so npm can extract bundled executables reliably. Docker builds copy the vendored release before installing. Both source and tarball installation work when the separate bundle source repository is absent.
 
 ## Developing both repositories together
 
@@ -57,4 +57,4 @@ npm run test:container
 
 Remove superseded vendored tarballs after verifying the new release; retain released artifacts elsewhere for rollback. The application imports `pi-experiment-ops/sdk`; the bundle owns the Pi dependency and version. Once published, a registry version can replace the vendored dependency without changing the runtime API. Registry publication is a separate release action.
 
-Backend workspace paths come from the bundle's `workspacePaths()` helper; browser metadata stays under `.eaa-pi`. Initialization preserves existing workflow definitions and settings. Fresh workspaces obtain the toy graph from the installed bundle. Existing demo workflows with the earlier fixture markers remain supported.
+Backend workspace paths come from the bundle's `workspacePaths()` helper; browser metadata stays under `.eaa-pi`. Initialization preserves existing workflow definitions and settings. Fresh workspaces obtain the toy workflow from the installed bundle. Existing YAML workflows require conversion to pi-subagents resource modules.

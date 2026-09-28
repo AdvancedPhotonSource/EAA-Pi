@@ -8,7 +8,7 @@ COPY vendor ./vendor
 RUN npm ci --legacy-peer-deps --no-audit --no-fund
 COPY . .
 RUN bash node_modules/pi-experiment-ops/scripts/install.sh --runtime-only && if [ -d src ]; then npm run build; fi && npm prune --omit=dev --legacy-peer-deps --no-audit --no-fund
-ENV NODE_ENV=production PI_GRAPH_PYTHON=/opt/eaa-pi/node_modules/pi-experiment-ops/.runtime/python/bin/python
+ENV NODE_ENV=production PI_OPS_PYTHON=/opt/eaa-pi/node_modules/pi-experiment-ops/.runtime/python/bin/python
 RUN mkdir -p /workspace && chown node:node /workspace
 USER node
 WORKDIR /workspace

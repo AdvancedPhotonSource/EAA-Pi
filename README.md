@@ -4,7 +4,7 @@ EAA's React control center, backed by Pi and community extensions. This reposito
 
 ## Quickstart
 
-Requirements: native Linux, Node.js **22.19 or newer**, Git, Bash, and [uv](https://docs.astral.sh/uv/getting-started/installation/). The installer provisions Python 3.12 and the locked graph dependencies. A C/C++ toolchain may be needed if a PTY binary is unavailable for your platform.
+Requirements: native Linux, Node.js **22.19 or newer**, Git, Bash, and [uv](https://docs.astral.sh/uv/getting-started/installation/). The installer provisions Python 3.12 and the locked Python dependencies. A C/C++ toolchain may be needed if a PTY binary is unavailable for your platform.
 
 ```bash
 bash scripts/install.sh /tmp/my-eaa-demo
@@ -82,4 +82,4 @@ npm run test:package
 npm run test:container
 ```
 
-The acceptance suite exercises installed Pi packages and actual pi-graph child processes. The deterministic provider tests transport, tool calls, images, orchestration, persistence, and policy enforcement; optional live-provider validation is described separately in the validation guide.
+The acceptance suite exercises installed Pi packages and actual pi-subagents workflows. The deterministic provider tests transport, tool calls, images, orchestration, persistence, and policy enforcement; optional live-provider validation is described separately in the validation guide.

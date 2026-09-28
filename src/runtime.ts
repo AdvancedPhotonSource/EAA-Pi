@@ -139,8 +139,9 @@ export class Runtime extends EventEmitter {
     this.bus.on("subagent:async-complete", (event: any) => {
       const runId = event.runId ?? event.id;
       if (!runId) return;
+      this.emit("subagentComplete", event);
       this.subagentIds.delete(runId);
-      const status = event.stopped || event.status === "stopped" ? "cancelled" : event.exitCode || ["failed", "rejected", "partial"].includes(event.status) ? "failed" : "completed";
+      const status = event.stopped || (event.state ?? event.status) === "stopped" ? "cancelled" : event.success === false || event.exitCode || ["failed", "rejected", "partial"].includes(event.state ?? event.status) ? "failed" : "completed";
       this.finishJob(`subagent:${runId}`, status, event.summary || event.output || `Subagent ${status}`);
     });
     this.bus.on("eaa:mcp-tool", (tool: any) => this.mcpTools.set(tool.name, tool.server));
@@ -426,9 +427,9 @@ export class Runtime extends EventEmitter {
     if (action === "steer") this.requireBuild();
     return this.rpc(action, { id: runId, message });
   }
-  busRequest(channel: string, params: Record<string, unknown> = {}): Promise<any> {
+  busRequest(channel: string, params: Record<string, unknown> = {}, timeoutMs = 10000): Promise<any> {
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`${channel} unavailable`)), 10_000);
+      const timer = setTimeout(() => reject(new Error(`${channel} unavailable`)), timeoutMs);
       this.bus.emit(channel, { ...params, reply: (result: any) => { clearTimeout(timer); resolve(result); } });
     });
   }
@@ -490,7 +491,7 @@ export class Runtime extends EventEmitter {
           try { event = JSON.parse(lines[index]); } catch { this.log("observer", `Ignoring an incomplete child event in ${file}`, "warning"); continue; }
           const childId = basename(file, ".jsonl");
           if (event.type === "eaa_child") {
-            const conversation = this.conversation(childId, event.label || `Child ${childId.slice(0, 8)}`, event.kind || "subagent");
+            const conversation = this.conversation(childId, event.label || `Child ${childId.slice(-8)}`, event.kind || "subagent");
             this.store.set(`child:${childId}`, JSON.stringify({ parent: this.snapshot.session_id, run: event.run, sessionFile: event.sessionFile }));
             if (!this.childSessions.has(childId)) {
               const saved = this.store.get(`child-session:${childId}`);

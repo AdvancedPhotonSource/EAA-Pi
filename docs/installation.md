@@ -2,7 +2,7 @@
 
 ## Native source installation
 
-Install Node.js ≥22.19, Git, Bash, and uv. Run `bash scripts/install.sh /absolute/workspace`. It installs the npm dependency graph from `npm-shrinkwrap.json`, invokes the installed `pi-experiment-ops` Python installer, builds the frontend/server, and runs `doctor`. Running it again preserves workspace configuration and existing sessions. Python packages are isolated from the system interpreter. `PI_GRAPH_PYTHON` is explicitly set by the CLI; set it yourself only when supplying an equivalent environment.
+Install Node.js ≥22.19, Git, Bash, and uv. Run `bash scripts/install.sh /absolute/workspace`. It installs the npm dependency graph from `npm-shrinkwrap.json`, invokes the installed `pi-experiment-ops` Python installer, builds the frontend/server, and runs `doctor`. Running it again preserves workspace configuration and existing sessions. Python packages are isolated from the system interpreter. `PI_OPS_PYTHON` is explicitly set by the CLI; set it yourself only when supplying an equivalent environment.
 
 The application uses Python 3.12; this build was tested with 3.12.11. The Python lock includes hashes. The lock and its update command belong to `pi-experiment-ops`; release a new bundle to update Python dependencies here.
 
@@ -55,7 +55,7 @@ The tarball contains the compiled server/frontend, bundled community resources, 
 
 `--legacy-peer-deps` is intentional: some unchanged community manifests still declare older Pi peer package names. Pi 0.85.1's extension loader supplies compatibility aliases. The runtime uses the pinned current SDK rather than loading a second agent runtime for those peer declarations.
 
-`eaa-pi pi` delegates to the installed `pi-experiment-ops` launcher. pi-graph's runtime and Python provisioning are managed by the bundle according to its integration contract.
+`eaa-pi pi` delegates to the installed `pi-experiment-ops` launcher. Subagent workflow resources and Python provisioning are managed by the bundle according to its integration contract.
 
 ## Pi TUI and CLI passthrough
 
@@ -85,7 +85,7 @@ Other passthrough examples:
 
 ```bash
 eaa-pi pi --workspace /path/to/workspace -- --version
-eaa-pi piw --workspace /path/to/workspace -- list
+eaa-pi pi --workspace /path/to/workspace
 ```
 
 Pi flags follow `--`; Pi's configuration and authentication files remain in the selected workspace. Avoid running two hosts against one workspace. The web host owns one active primary session; its session controls enforce idle replacement.
@@ -101,7 +101,7 @@ To uninstall, stop the application and remove its installation directory (or use
 | Symptom | Action |
 |---|---|
 | `node:sqlite` unavailable | Use Node 22.19+; an experimental SQLite notice is expected on tested versions. |
-| Python executable missing / graph import error | Rerun the installer; inspect `PI_GRAPH_PYTHON` and `doctor`. |
+| Python executable missing / Python import error | Rerun the installer; inspect `PI_OPS_PYTHON` and `doctor`. |
 | `npm ci` reports missing keyring/recheck platform packages | Use the current shrinkwrap. When maintaining an older checkout, run `npm install --package-lock-only --ignore-scripts --legacy-peer-deps --no-audit --no-fund`, then rerun the installer. This restores optional platform metadata without replacing `npm ci`. |
 | Peer dependency installation failure | Use the documented `--legacy-peer-deps` tarball command. |
 | PTY startup fails | Check platform support and native build prerequisites; Linux is the supported target. |

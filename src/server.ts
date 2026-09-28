@@ -112,9 +112,9 @@ export async function startServer(runtime: Runtime, port = runtime.config.port, 
       const terminal = route.match(/^\/api\/terminals\/([^/]+)\/input$/);
       if (terminal) return json(await runtime.terminal({ sessionId: decodeURIComponent(terminal[1]), input: String(body.input ?? ""), submit: body.submit !== false }));
       if (route === "/api/workflows/run") return json(await workflows.run(String(body.input || ""), body.workflow), 201);
-      if (route === "/api/workflows/resume") return json(await workflows.run("", undefined, body.id), 201);
+      if (route === "/api/workflows/rerun") return json(await workflows.run("", undefined, body.id), 201);
       const job = route.match(/^\/api\/jobs\/([^/]+)\/cancel$/);
-      if (job) { const jobId = decodeURIComponent(job[1]); return json(jobId.startsWith("workflow:") ? workflows.cancel(jobId.slice(9)) : await runtime.cancelJob(jobId)); }
+      if (job) { const jobId = decodeURIComponent(job[1]); return json(jobId.startsWith("workflow:") ? await workflows.cancel(jobId.slice(9)) : await runtime.cancelJob(jobId)); }
       throw new HttpError(404, "Unknown API route");
     } catch (error) {
       if (res.headersSent) { res.end(); return; }

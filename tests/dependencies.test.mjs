@@ -11,8 +11,10 @@ test("experiment-ops owns the single installed Pi SDK and CLI", async () => {
   const manifest = JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8"));
   assert.ok(Object.keys(manifest.dependencies).every(name => !name.startsWith("@earendil-works/pi-")));
   assert.equal(realpathSync(packageRoot), realpathSync(join(PACKAGE_ROOT, "node_modules/pi-experiment-ops")));
-  const installed = globSync("node_modules/**/@earendil-works/pi-coding-agent/package.json", { cwd: packageRoot })
-    .map(path => join(packageRoot, dirname(path)));
+  const backend = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8"));
+  assert.equal(backend.dependencies["@ali-abassi/piw"], undefined);
+  const installed = globSync("node_modules/**/@earendil-works/pi-coding-agent/package.json", { cwd: PACKAGE_ROOT })
+    .map(path => join(PACKAGE_ROOT, dirname(path)));
   assert.equal(installed.length, 1, "Only one physical Pi package should be installed");
   assert.equal(realpathSync(piCli), join(realpathSync(installed[0]), "dist/bundle/cli.js"));
   const native = await import(pathToFileURL(resolve(dirname(piCli), "../index.js")));

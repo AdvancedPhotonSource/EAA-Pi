@@ -1,7 +1,7 @@
 import { createReadTool, createBashTool, createEditTool, createWriteTool, createGrepTool, createFindTool, createLsTool, type ExtensionAPI } from "pi-experiment-ops/sdk";
 import { registerRequiredChildExtensions } from "pi-experiment-ops/subagents";
 import { mkdirSync, appendFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, basename, dirname } from "node:path";
 
 export default function (pi: ExtensionAPI) {
   let file: string;
@@ -11,7 +11,8 @@ export default function (pi: ExtensionAPI) {
     const root = join(process.env.EAA_PI_WORKSPACE!, ".eaa-pi/children", process.env.EAA_PI_PARENT_SESSION!);
     mkdirSync(root, { recursive: true, mode: 0o700 });
     file = join(root, ctx.sessionManager.getSessionId() + ".jsonl");
-    record({ type: "eaa_child", id: ctx.sessionManager.getSessionId(), sessionFile: ctx.sessionManager.getSessionFile(), parent: process.env.EAA_PI_PARENT_SESSION, kind: "subagent" });
+    const workflowRun = dirname(ctx.cwd).endsWith("/.pi-experiment-ops/workflows/runs") ? basename(ctx.cwd) : undefined;
+    record({ type: "eaa_child", id: ctx.sessionManager.getSessionId(), sessionFile: ctx.sessionManager.getSessionFile(), parent: process.env.EAA_PI_PARENT_SESSION, kind: workflowRun ? "workflow" : "subagent", run: workflowRun });
     for (const create of [createReadTool, createBashTool, createEditTool, createWriteTool, createGrepTool, createFindTool, createLsTool]) {
       pi.registerTool({ ...create(ctx.cwd), executionMode: "sequential" } as any);
     }

@@ -1,9 +1,9 @@
-import { initialize as initializeOps, packageRoot as opsRoot, piwCli } from "pi-experiment-ops";
+import { initialize as initializeOps, packageRoot as opsRoot } from "pi-experiment-ops";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { initialize, configureEnvironment, loadConfig, writeJson, agentDir, migrateLegacySessions, PACKAGE_ROOT, adapterResources } from "./config.js";
-import { startModelFixture, startInstrumentFixture, configureDemoWorkflow } from "./fixture.js";
+import { startModelFixture, startInstrumentFixture } from "./fixture.js";
 
 const args = process.argv.slice(2);
 const command = args.shift() || "serve";
@@ -14,7 +14,7 @@ function option(name: string, fallback: string): string {
   return args.splice(index, 2)[1];
 }
 if (command === "help" || command === "--help") {
-  console.log("eaa-pi init|doctor|serve|demo|pi|piw [--workspace DIR] [--host HOST] [--port PORT]\nPi and piw arguments follow --. Default workspace: current directory.");
+  console.log("eaa-pi init|doctor|serve|demo|pi [--workspace DIR] [--host HOST] [--port PORT]\nPi arguments follow --. Default workspace: current directory.");
 } else if (command === "pi") {
   const workspace = initializeOps(resolve(option("--workspace", process.cwd())));
   migrateLegacySessions(workspace);
@@ -33,25 +33,17 @@ if (command === "help" || command === "--help") {
       { name: "Node.js", ok: Number(process.versions.node.split(".")[0]) > 22 || (Number(process.versions.node.split(".")[0]) === 22 && Number(process.versions.node.split(".")[1]) >= 19), detail: process.versions.node },
       { name: "Frontend", ok: existsSync(join(PACKAGE_ROOT, "dist/webui/index.html")) },
       { name: "Pi extensions", ok: paths.extensions.every(existsSync) },
-      { name: "Python dependencies", ok: spawnSync(process.env.PI_GRAPH_PYTHON!, ["-c", "import yaml, ruamel.yaml, jsonschema"]).status === 0 },
+      { name: "Python dependencies", ok: spawnSync(process.env.PI_OPS_PYTHON!, ["-c", "import yaml, ruamel.yaml, jsonschema"]).status === 0 },
       { name: "Pi CLI", ok: spawnSync(join(PACKAGE_ROOT, "bin/shims/pi"), ["--version"], { encoding: "utf8" }).status === 0 },
     ];
     const config = loadConfig(workspace);
     console.log(JSON.stringify({ workspace, checks, providerConfigured: Boolean(config.provider && config.model), agentDirectory: agentDir(workspace) }, null, 2));
     process.exitCode = checks.every(check => check.ok) ? 0 : 1;
-  } else if (command === "piw") {
-    process.chdir(workspace);
-    const forwarded = args[0] === "--" ? args.slice(1) : args;
-    const child = spawn(piwCli, forwarded, { cwd: workspace, stdio: "inherit" });
-    for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => child.kill(signal));
-    child.on("error", error => { console.error(error.message); process.exitCode = 1; });
-    child.on("exit", code => { process.exitCode = code ?? 1; });
   } else if (command === "serve" || command === "demo") {
     if (command === "demo" && (loadConfig(workspace).provider && loadConfig(workspace).provider !== "eaa-demo")) throw new Error("Use a separate workspace for the demo; this workspace has a provider configured.");
     const model = command === "demo" ? await startModelFixture() : undefined;
     const instrument = command === "demo" ? await startInstrumentFixture() : undefined;
     if (model && instrument) {
-      configureDemoWorkflow(workspace);
       const settingsPath = join(agentDir(workspace), "settings.json");
       writeJson(settingsPath, { ...JSON.parse(readFileSync(settingsPath, "utf8")), defaultProvider: "eaa-demo", defaultModel: "toy" });
       const previousModels = existsSync(join(agentDir(workspace), "models.json")) ? JSON.parse(readFileSync(join(agentDir(workspace), "models.json"), "utf8")) : {};

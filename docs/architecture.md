@@ -8,26 +8,23 @@ flowchart LR
   SDK --> Children[pi-subagents]
   SDK --> Processes[pi-processes]
   SDK --> PTY[pi-interactive-shell]
-  Host --> Graph[piw / pi-graph]
-  Graph --> Shim[Pi launcher and event recorder]
-  Shim --> PiCLI[Unchanged Pi CLI]
+  Host --> Children
   Host --> State[(Adapter SQLite)]
   SDK --> Sessions[Pi JSONL sessions]
   Sessions --> Archive[(Pinned SQLite archive)]
-  Shim --> Observer[Child transcript observer]
-  Children --> Observer
+  Children --> Observer[Child transcript observer]
   Observer --> Sessions
 ```
 
 ## Ownership
 
-`pi-experiment-ops` is a separate package owning pinned upstream resources, workflow examples, and Python provisioning. This application obtains resource paths through its exported `resources()` function, replacing the policy, MCP, terminal, and archive entrypoints with browser bridges. Upstream APIs needed by those bridges are available through bundle exports. The dependency points from this application to the bundle; the bundle has no frontend or HTTP dependency. The WebUI imports Pi's unchanged SDK through `pi-experiment-ops/sdk`, and the child observer launcher uses the bundle's `piCli`. The bundle owns the single installed Pi dependency. Native provider configuration and session paths come from its `workspacePaths()` helper. See [repository separation](repositories.md).
+`pi-experiment-ops` is a separate package owning pinned upstream resources, workflow examples, and Python provisioning. This application obtains resource paths through its exported `resources()` function, replacing the policy, MCP, terminal, and archive entrypoints with browser bridges. Upstream APIs needed by those bridges are available through bundle exports. The dependency points from this application to the bundle; the bundle has no frontend or HTTP dependency. The WebUI imports Pi's unchanged SDK through `pi-experiment-ops/sdk`, and the CLI forwarding launcher uses the bundle's `piCli`. The bundle owns the single installed Pi dependency. Native provider configuration and session paths come from its `workspacePaths()` helper. See [repository separation](repositories.md).
 
-Pi owns primary agent execution, messages, tool calls, provider transport, and session files. Pi-subagents owns child launch/steer/stop/lifecycle. Pi-processes owns process execution. Pi-interactive-shell owns PTYs. Pi-graph owns workflow scheduling, gates, cancellation, run ledgers, and resume. The adapter owns browser transport, resource controls, display projections, artifact registration, and completion deduplication.
+Pi owns primary agent execution, messages, tool calls, provider transport, and session files. Pi-subagents owns child launch/steer/stop/lifecycle. Pi-processes owns process execution. Pi-interactive-shell owns PTYs. Pi-subagents also owns workflow execution, host-command grants, cancellation, and receipts. The adapter owns browser transport, resource controls, display projections, artifact registration, and completion deduplication.
 
-The SDK host loads the bundle's extension entry points: policy, MCP factory bridge, terminal registration bridge, upstream subagents, upstream processes, upstream modes, archive discovery bridge, upstream graph, and CodeMode when available. The EAA CodeMode bridge preserves one-shot agent metadata while the host polls background results for its execution queue. Bridges wrap extension registration or consume public events. Dependency files are unchanged.
+The SDK host loads the bundle's extension entry points: policy, MCP factory bridge, terminal registration bridge, upstream subagents, upstream processes, upstream modes, archive discovery bridge, workspace workflows, and CodeMode when available. The EAA CodeMode bridge preserves one-shot agent metadata while the host polls background results for its execution queue. Bridges wrap extension registration or consume public events. Dependency files are unchanged.
 
-The archive bridge scopes startup discovery to application sessions instead of the upstream extension's default home-directory scan. It retains the upstream search tool, schema, and turn indexer. Graph recordings are persisted with Pi's SessionManager and indexed through the pinned archive's exported indexer. A child session includes an `eaa-parent` custom entry; adapter metadata additionally maps it to the primary/workflow run.
+The archive bridge scopes startup discovery to application sessions instead of the upstream extension's default home-directory scan. It retains the upstream search tool, schema, and turn indexer. Child recordings are persisted with Pi's SessionManager and indexed through the pinned archive's exported indexer. A child session includes an `eaa-parent` custom entry; adapter metadata additionally maps it to the primary/workflow run.
 
 Session replacement disposes the current runtime, emits shutdown, reloads resources, binds extension UI hooks, subscribes to the new session, and reapplies sequential tool execution. New/resume/branch share this path. The application intentionally has one active primary session per instance.
 
@@ -68,12 +65,12 @@ POST bodies are JSON. Errors return `{ "error": "...", "message": "..." }`. HTTP
 | `POST /api/jobs/:id/cancel` | URL-encoded `process:…`, `terminal:…`, `subagent:…`, `workflow:…`, or `codemode:…` ID |
 | `GET /api/workflows` | Available workflow names and host workflow records for the active primary session |
 | `POST /api/workflows/run` | `{input, workflow}` |
-| `POST /api/workflows/resume` | `{id: hostRunId}` |
+| `POST /api/workflows/rerun` | `{id: hostRunId}`; fresh execution of saved definition/input |
 
-Plan mode denies mutating launch/steer/input endpoints as well as model tool calls. Session replacement rejects active work and lists it in the error. Primary prompt interruption, job cancellation, session history restoration, and workflow resume are distinct operations.
+Plan mode denies mutating launch/steer/input endpoints as well as model tool calls. Session replacement rejects active work and lists it in the error. Primary prompt interruption, job cancellation, session history restoration, and workflow rerun are distinct operations.
 
 ## Data and recovery contracts
 
-Pi JSONL files remain authoritative for primary conversation histories. Adapter SQLite persists the UI snapshot, relationship metadata, workflow records, artifact references, and completed-job identities. The pinned archive indexes searchable transcript entries. Child event streams provide live display and durable Pi-format projections without changing the graph runner. Failed or stopped child assistant messages retain their native stop reasons in those Pi sessions.
+Pi JSONL files remain authoritative for primary conversation histories. Adapter SQLite persists the UI snapshot, relationship metadata, workflow records, artifact references, and completed-job identities. The pinned archive indexes searchable transcript entries. Child event streams provide live display and durable Pi-format projections through a required child extension. Failed or stopped child assistant messages retain their native stop reasons in those Pi sessions.
 
 The server's graceful shutdown closes HTTP streams and the extensions' owned resources. The CLI exits after those hooks because some upstream CLI-oriented modules retain idle timers; the test harness uses Node's `--test-force-exit` for the same reason after explicit cleanup. Transcript recovery does not imply process resurrection. This version supports graceful restart and interrupted-state recovery, not transparent migration of live OS processes between hosts.

@@ -12,11 +12,13 @@ test("non-root filesystem boundary contains every execution path", { timeout: 18
   const workspace = initialize("/workspace");
   configureEnvironment(workspace);
   const model = await startModelFixture();
-  writeJson(join(workspace, "eaa-pi.json"), { provider: "eaa-demo", model: "toy", host: "127.0.0.1", port: 0 });
+  writeJson(join(workspace, "eaa-pi.json"), { host: "127.0.0.1", port: 0 });
+  writeJson(join(agentDir(workspace), "settings.json"), { offline: true, packages: [], defaultProvider: "eaa-demo", defaultModel: "toy" });
   writeJson(join(agentDir(workspace), "models.json"), { providers: { "eaa-demo": { baseUrl: model.url, api: "openai-completions", apiKey: "fixture", models: [{ id: "toy", reasoning: false, input: ["text"], contextWindow: 128000, maxTokens: 4096, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }] } } });
   const { Runtime } = await import("/opt/eaa-pi/dist/server/runtime.js");
   const { startServer } = await import("/opt/eaa-pi/dist/server/server.js");
   const runtime = new Runtime(workspace); await runtime.start();
+  runtime.setPermissionAutoAllow(true);
   const app = await startServer(runtime, 0);
   const wait = async predicate => {
     for (let i = 0; i < 900; i++) { if (await predicate()) return; await new Promise(r => setTimeout(r, 100)); }
@@ -38,18 +40,19 @@ test("non-root filesystem boundary contains every execution path", { timeout: 18
     await runtime.terminal({ sessionId: terminal.details.sessionId, input: "echo escaped > /fixtures/sentinel; echo boundary-finished", submit: true });
     await wait(() => runtime.snapshot.conversations.some(c => c.terminal?.chunks.some(x => /Read-only file system|Permission denied/i.test(x.text))));
     await runtime.cancelJob(`terminal:${terminal.details.sessionId}`);
-    for (const [name, steps] of [
-      ["command-boundary", '  - id: write\n    cmd: echo escaped > /fixtures/sentinel\n'],
-      ["agent-boundary", '  - id: write\n    agent: true\n    tools: write\n    prompt: EAA_BOUNDARY_WRITE\n'],
-    ]) {
+    for (const name of ["command-boundary", "agent-boundary"]) {
       const dir = join(workspace, "workflows", name); mkdirSync(dir);
-      writeFileSync(join(dir, "steps.yaml"), `version: 1\nworkflow: ${name}\nmodel: eaa-demo/toy\nthinking: "off"\nworkers: 1\nsteps:\n${steps}`);
+      const command = "echo escaped > /fixtures/sentinel";
+      const script = name === "command-boundary"
+        ? `const result = await runs.host('write', { kind: 'command', command: ${JSON.stringify(command)}, timeoutMs: 5000 }); if (!result.ok) throw new Error(result.stderr); return result;`
+        : `return runs.run('write', { agent: 'worker', task: 'EAA_BOUNDARY_WRITE', tools: ['write'], context: 'fresh' });`;
+      writeFileSync(join(dir, "workflow.mjs"), `export default { name: ${JSON.stringify(name)}, version: 1, resolve() { return ${JSON.stringify({ script, hostCommands: [{ key: "write", command }] })}; } };`);
       const run = await app.workflows.run("boundary", name);
       await wait(() => JSON.parse(runtime.store.get(`workflow:${run.id}`)).status !== "running");
       const record = JSON.parse(runtime.store.get(`workflow:${run.id}`));
       if (name === "command-boundary") {
         assert.equal(record.status, "failed");
-        assert.match(readFileSync(join(record.run_dir, "write.stderr"), "utf8"), /Read-only file system|Permission denied/i);
+        assert.match(JSON.stringify(record.result), /Read-only file system|Permission denied/i);
       } else {
         assert.equal(record.status, "completed", JSON.stringify(record));
         await wait(() => runtime.snapshot.conversations.some(c => c.kind === "workflow" && c.messages.some(m => m.role === "tool" && /EROFS|EACCES/.test(m.content))));

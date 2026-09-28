@@ -24,7 +24,7 @@ At WebUI or TUI startup, eaa-pi moves existing `.eaa-pi/agent/sessions/*.jsonl` 
 
 In **Sessions & tools → Subagents**, select an agent, enter its task, and click **Launch subagent**. The list uses pi-subagents discovery, including `.pi/agents` definitions and project overrides. The task field is independent of workflow input; launch requires an agent and a nonempty task. Child conversations appear as events arrive. **Refresh runs** lists upstream async run IDs; **Send task** delivers a steering message and **Stop child** requests cancellation. These controls use pi-subagents' public event-bus RPC and retain its ownership and acknowledgment checks. The main composer addresses the primary agent; the child control addresses the selected run.
 
-Workflow agents appear in separate tabs while pi-graph runs them. Their launcher records JSON events even though pi-graph disables native child session persistence. Parent relationships and workflow run IDs are stored durably. Closing a conversation tab is a display action; it does not stop execution.
+Workflow agents appear in separate tabs while pi-subagents runs them. The required child observer records their events. Parent relationships and workflow run IDs are stored durably. Closing a conversation tab is a display action; it does not stop execution.
 
 ## Background processes and interactive shells
 
@@ -46,8 +46,8 @@ The mode requires idle state because already-running agents or commands cannot b
 
 Refreshing or reconnecting the browser receives an authoritative snapshot before subsequent events. Messages and job completions use stable IDs; terminal chunks and SSE events have sequence numbers. A reconnect does not replay completion effects.
 
-Restarting the host restores the active primary Pi session and adapter-owned child/terminal histories. Processes and PTYs from a previous host are marked interrupted; a restored transcript does not reconnect a shell. Graceful shutdown stops owned children and processes. After a hard native host crash, check for surviving operating-system processes before resuming work; detached pi-graph runners may outlive the HTTP host. Container shutdown contains those descendants within the same boundary.
+Restarting the host restores the active primary Pi session and adapter-owned child/terminal histories. Processes and PTYs from a previous host are marked interrupted; a restored transcript does not reconnect a shell. Graceful shutdown stops owned children and processes. After a hard native host crash, check for surviving operating-system processes before resuming work; detached subagent runners may outlive the HTTP host. Container shutdown contains those descendants within the same boundary.
 
-Workflow records with incomplete host state are marked interrupted; available run directories can be resumed through pi-graph. Resume reuses completed nodes. The toy receipt makes rendering idempotent. A completed workflow's Resume request returns its existing result. See the workflow guide for failed-command recovery.
+Workflow records with incomplete host state are marked interrupted. **Run again** starts the saved definition and input in a new directory and executes every step. See the workflow guide for failure and retry examples.
 
 Back up the whole workspace while the host is stopped, including both SQLite databases and their WAL files if present. Primary Pi JSONL sessions remain the conversation authority; the archive is a search index, and adapter SQLite stores presentation/relationship state. Legacy EAA checkpoints are not converted.

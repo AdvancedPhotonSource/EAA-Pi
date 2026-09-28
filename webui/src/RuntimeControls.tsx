@@ -18,7 +18,7 @@ export function RuntimeControls({ planMode, jobs, onChanged, onExpandedChange }:
   const [agent, setAgent] = useState("");
   const [subagentTask, setSubagentTask] = useState("");
   const [task, setTask] = useState("");
-  const [runs, setRuns] = useState<{ id: string; status: string; run_dir?: string }[]>([]);
+  const [runs, setRuns] = useState<{ id: string; status: string; runner?: string; run_dir?: string }[]>([]);
   const [children, setChildren] = useState<{ id: string }[]>([]);
   const [error, setError] = useState("");
   const refresh = async () => {
@@ -82,7 +82,7 @@ export function RuntimeControls({ planMode, jobs, onChanged, onExpandedChange }:
         {!runs.length && <p className="eaa-runtime-empty">Your workflow runs will appear here.</p>}
         {runs.slice().reverse().map(r => <div className="eaa-run-card" key={r.id}>
           <div className="eaa-run-summary"><FileText size={17} /><span title={r.id}>Workflow {r.id.slice(0, 8)}</span><span className={`eaa-run-status status-${r.status}`}>{r.status}</span></div>
-          {r.run_dir && r.status !== "running" && <button disabled={planMode} onClick={() => void run("/api/workflows/resume", { id: r.id })}><RotateCcw size={13} />Resume workflow</button>}
+          {r.runner === "pi-subagents" && r.status !== "running" && <button disabled={planMode} onClick={() => void run("/api/workflows/rerun", { id: r.id })}><RotateCcw size={13} />Run again</button>}
         </div>)}
       </section>
       <section className="eaa-runtime-section" aria-label="Subagents"><h2>Subagents</h2>

@@ -21,10 +21,12 @@ test("EAA chat streams once, survives reload, and exposes runtime controls", asy
   await expect(page.getByRole("button", { name: "Launch subagent", exact: true })).toBeDisabled();
   await page.getByRole("textbox", { name: "Workflow task" }).fill("Three example measurements");
   await page.getByRole("button", { name: "Run workflow", exact: true }).click();
-  await expect.poll(async () => (await (await request.get("/api/state")).json()).conversations.some((c: any) => c.kind === "workflow" && c.messages.some((m: any) => m.role === "assistant")), { timeout: 60000 }).toBeTruthy();
+  await expect.poll(async () => (await (await request.get("/api/state")).json()).conversations.filter((c: any) => c.kind === "workflow" && c.messages.some((m: any) => m.role === "assistant")).length, { timeout: 60000 }).toBe(2);
+  const workflowChildren = (await (await request.get("/api/state")).json()).conversations.filter((c: any) => c.kind === "workflow");
+  for (const child of workflowChildren) await expect(page.getByRole("button", { name: child.label, exact: true })).toBeVisible();
   await expect.poll(async () => (await (await request.get("/api/workflows")).json()).runs.some((r: any) => r.status === "completed"), { timeout: 60000 }).toBeTruthy();
   await page.getByRole("button", { name: "Refresh runs", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Resume workflow", exact: true })).toBeVisible({ timeout: 60000 });
+  await expect(page.getByRole("button", { name: "Run again", exact: true })).toBeVisible({ timeout: 60000 });
   await page.getByRole("button", { name: "Collapse sessions and tools" }).click();
   await page.getByRole("button", { name: "Main Agent", exact: true }).click();
   await expect(page.getByText("Images (0)", { exact: true })).toBeVisible();

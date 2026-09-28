@@ -1,6 +1,6 @@
 # Execution boundary and containers
 
-Native execution is unsandboxed. File tools, bash, extensions, process jobs, PTYs, subagents, and graph commands have the permissions of the account that launches the application. Plan mode is an execution policy enforced by the host and tool hooks; it is not an OS sandbox.
+Native execution is unsandboxed. File tools, bash, extensions, process jobs, PTYs, subagents, and workflow host commands have the permissions of the account that launches the application. Plan mode is an execution policy enforced by the host and tool hooks; it is not an OS sandbox.
 
 ## Container usage
 
@@ -21,7 +21,7 @@ For Docker, omit the Podman `--userns=keep-id` option and arrange for the worksp
 
 To reuse a configured experiment-ops workspace, mount it as the container's writable workspace and run `serve`. Both interfaces use its `.pi-experiment-ops/agent` configuration and sessions. The files must be accessible to the container user.
 
-The image runs as non-root, with a read-only application/root filesystem, read-only `/fixtures`, and writable `/workspace` and temporary storage. No host container socket is mounted. All local descendants inherit this boundary, including Python graph runners and Pi child CLIs. Expose additional host files only through explicit mounts. Credentials placed in the workspace are server-side but available to trusted agent execution inside this boundary.
+The image runs as non-root, with a read-only application/root filesystem, read-only `/fixtures`, and writable `/workspace` and temporary storage. No host container socket is mounted. All local descendants inherit this boundary, including workflow host commands and Pi child agents. Expose additional host files only through explicit mounts. Credentials placed in the workspace are server-side but available to trusted agent execution inside this boundary.
 
 Outbound network access remains available for model/MCP calls. This configuration isolates filesystem access; it does not impose a network destination allowlist. Apply deployment-specific networking if required. An external MCP instrument service is outside the container and must enforce its own permissions and operation ordering.
 
@@ -33,4 +33,4 @@ There is no multi-user authentication or authorization layer. Do not expose this
 
 ## Acceptance checks
 
-`npm run test:container` builds the image, mounts a read-only sentinel and writable workspace, and exercises attempted writes through real Pi file tools, bash, pi-processes, a PTY, graph command nodes, and graph agent children. It checks traversal/symlink paths, absent host-only paths, a read-only application filesystem, non-root identity, and absence of the host container socket. `CONTAINER_ENGINE=docker` selects Docker; rootless Podman is the default test engine. Missing runtimes are reported as blocked, not passed.
+`npm run test:container` builds the image, mounts a read-only sentinel and writable workspace, and exercises attempted writes through real Pi file tools, bash, pi-processes, a PTY, workflow host commands, and workflow agent children. It checks traversal/symlink paths, absent host-only paths, a read-only application filesystem, non-root identity, and absence of the host container socket. `CONTAINER_ENGINE=docker` selects Docker; rootless Podman is the default test engine. Missing runtimes are reported as blocked, not passed.

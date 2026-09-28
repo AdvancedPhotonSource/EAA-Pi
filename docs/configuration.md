@@ -18,7 +18,7 @@
 | `.eaa-pi/agent/children/` | Durable Pi-format child transcript projections |
 | `.eaa-pi/children/` | Captured child JSON events, grouped by primary session |
 | `.pi-experiment-ops/subagents/` | Upstream subagent lifecycle, control, and result artifacts |
-| `.pi-experiment-ops/graph/` | Copied workflow definitions, run ledgers, state, receipts |
+| `.pi-experiment-ops/workflows/runs/` | Copied workflow definitions, outputs, receipts |
 | `.eaa-pi/artifacts/` | Content-addressed gallery images |
 | `.eaa-pi/adapter.sqlite` | Frontend snapshots, relationships, artifact references, completion IDs |
 | `.eaa-pi/mcp-trace.jsonl` | Bounded MCP protocol metadata trace |
@@ -27,7 +27,7 @@
 | `.pi/agents/reviewer.md` | Toy ad hoc reviewer definition |
 | `workflows/toy/` | Editable toy workflow source |
 
-Global Pi extensions and original EAA configuration are not imported. The host sets `PI_CODING_AGENT_DIR`, `PI_SUBAGENTS_TEMP_ROOT`, graph paths, and a workspace temporary directory before loading extensions. It explicitly supplies bundle resources with browser-specific entrypoint replacements. Workspace files and descendants still have native filesystem access unless the entire application runs in the container.
+Global Pi extensions and original EAA configuration are not imported. The host sets `PI_CODING_AGENT_DIR`, `PI_SUBAGENTS_TEMP_ROOT`, and a workspace temporary directory before loading extensions. It explicitly supplies bundle resources with browser-specific entrypoint replacements. Workspace files and descendants still have native filesystem access unless the entire application runs in the container.
 
 ## Real provider authentication
 
