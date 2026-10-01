@@ -1,35 +1,37 @@
 # EAA Pi
 
-EAA's React control center, backed by Pi and community extensions. This repository owns the frontend, MathJax assets, HTTP/SSE adapter, and browser extension bridges. It consumes the independently installable **pi-experiment-ops** bundle for Pi, community resources, Python provisioning, and the toy workflow. A versioned bundle tarball is included in `vendor/`, so installation needs no sibling checkout.
+EAA Pi is an AI assistant for experimental work. You can ask it to work with files, analyze data, and use connected tools or instruments, either in a terminal or through a web browser.
 
-## Install a release
+It is based on [pi-experiment-ops](https://github.com/AdvancedPhotonSource/pi-experiment-ops), which adds tools for experimental work to [Pi](https://pi.dev/), an AI agent that can carry out tasks on your computer. EAA Pi adds a web interface for conversations, results, and ongoing tasks. Both interfaces use the same project folder, so you can choose whichever suits your work.
 
-On Linux, install Node.js **22.19 or newer**, npm, Git, Bash, [uv](https://docs.astral.sh/uv/getting-started/installation/), curl, tar, and sha256sum. For a published release with package assets:
+## Installation
+
+EAA Pi currently supports **Linux**. Before installing, you need [Node.js](https://nodejs.org/) **22.19 or newer** with npm, [uv](https://docs.astral.sh/uv/getting-started/installation/), Git, Bash, curl, tar, and sha256sum. The installer sets up Python and the remaining dependencies for you.
+
+### Ordinary installation
+
+Open a terminal and run:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/AdvancedPhotonSource/EAA-Pi/v0.1.0/install.sh | \
   sh -s -- --version 0.1.0
 ```
 
-The installer verifies the release checksum, installs under `~/.local/share/eaa-pi`, provisions Python, and creates `~/.local/bin/eaa-pi`. It adds the launcher directory to your Bash or Zsh startup file. Open a new terminal, or run the `source` command printed by the installer, then choose your workspace:
+This downloads the release and installs the `eaa-pi` command. It also updates your Bash or Zsh startup settings so that the command is available in new terminals. After installation, **open a new terminal**, or run the `source` command printed by the installer. Then follow the quickstart below.
+
+The command requires the installer and package files to be published for that release. If they are not yet available, use the developer installation below. See the [installation guide](docs/installation.md#release-installation) for installation locations, upgrades, and other options.
+
+### Developer installation
+
+To build EAA Pi from its source code, download the repository and run its setup script:
 
 ```bash
-eaa-pi init --workspace /path/to/workspace
-# Configure the provider in this workspace, then start the WebUI.
-eaa-pi serve --workspace /path/to/workspace
+git clone https://github.com/AdvancedPhotonSource/EAA-Pi.git
+cd EAA-Pi
+bash scripts/install.sh --runtime-only
 ```
 
-An existing experiment-ops workspace uses its saved provider settings. Otherwise follow [provider configuration](docs/configuration.md#real-provider-authentication). Installation creates no workspace; use `--workspace DIR` or run `eaa-pi serve` from your workspace directory. See [release installation](docs/installation.md#release-installation) for local archives, upgrades, and installation paths.
-
-## Source quickstart
-
-Requirements: native Linux, Node.js **22.19 or newer**, Git, Bash, and [uv](https://docs.astral.sh/uv/getting-started/installation/). The installer provisions Python 3.12 and the locked Python dependencies. A C/C++ toolchain may be needed if a PTY binary is unavailable for your platform.
-
-```bash
-bash scripts/install.sh /tmp/my-eaa-demo
-```
-
-Enable the `eaa-pi` command by running this once from the repository root:
+The script installs dependencies and builds the application. Next, make the `eaa-pi` command available from other folders:
 
 ```bash
 mkdir -p "$HOME/.local/bin"
@@ -37,84 +39,129 @@ ln -s "$PWD/bin/eaa-pi.mjs" "$HOME/.local/bin/eaa-pi"
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-The shortcut works from any directory. If needed, add the `export` line to `~/.bashrc` to keep it available in new terminals. See [command setup](docs/installation.md#enable-the-eaa-pi-command) for tarball installations and removing the link.
+Add the `export` line to `~/.bashrc` (or `~/.zshrc` for Zsh) to keep it available in new terminals. After changing the source code, run `npm run build` again. See the [development checks](docs/validation.md#reproduction-and-results) for testing instructions.
 
-Start the demo:
+## Quickstart
 
-```bash
-eaa-pi demo --workspace /tmp/my-eaa-demo
-```
+### 1. Create a workspace
 
-Open **http://127.0.0.1:8010**. The demo uses a local deterministic model endpoint and simulated MCP instrument; no provider credentials are required. Try `hello`, `request approval`, `run background job`, or `review in background`. Use **Sessions & tools → select toy → enter a task → Run workflow** to exercise generator → reviewer → image creation.
-
-For a real provider, initialize an EAA workspace:
+A **workspace** is a folder that holds your project's settings, conversations, and results. Choose a folder for your work; this example uses `~/eaa-workspace`, where `~` means your home folder:
 
 ```bash
-eaa-pi init --workspace /path/to/workspace
+eaa-pi init --workspace ~/eaa-workspace
+cd ~/eaa-workspace
 ```
 
-If the workspace is already configured for experiment-ops, its provider settings and sessions are ready to use. Otherwise configure the provider with `pi-experiment-ops configure`, or edit `.pi-experiment-ops/agent/models.json` and set `defaultProvider`/`defaultModel` in `.pi-experiment-ops/agent/settings.json`. Both interfaces read these native Pi files directly. `eaa-pi.json` contains only the web host and port.
+Initialization creates the configuration files and an empty skills folder. You can also point it at an existing pi-experiment-ops workspace, since the two applications share their settings. Running `init` again preserves existing configuration.
 
-See [configuration and authentication](docs/configuration.md#real-provider-authentication) for custom endpoints and legacy workspace migration.
+The remaining file paths are relative to this workspace. Folders whose names begin with a dot, such as `.pi`, may be hidden in your file manager; enable “Show hidden files” to see them.
 
-Initialization creates the documented configuration files, including `.pi-experiment-ops/agent/models.json` with `{ "providers": {} }` and `auth.json` with `{}`. Rerunning `init` fills in missing files and preserves existing contents. Sessions, logs, databases, and workflow outputs are created when used.
+### 2. Configure an AI provider and model
 
-Then start EAA:
+A **provider** is the service that runs your AI model. You need its connection address, the exact model ID, and any required login details or API key. If your workspace already has a working provider, continue to step 3.
+
+For a service that supports the OpenAI-compatible chat API, open `.pi-experiment-ops/agent/models.json` in a text editor and use this starting point:
+
+```json
+{
+  "providers": {
+    "my-provider": {
+      "baseUrl": "https://YOUR_PROVIDER_ADDRESS/v1",
+      "api": "openai-completions",
+      "apiKey": "$MY_AI_API_KEY",
+      "models": [{ "id": "YOUR_MODEL_ID" }]
+    }
+  }
+}
+```
+
+Replace the address and model ID with the values supplied by your provider. `my-provider` is a name you choose for this connection. If the file already lists providers, add your entry inside `providers` while keeping the existing entries.
+
+The example reads your API key from a terminal setting named `MY_AI_API_KEY`. Set it before launching EAA Pi in that terminal:
 
 ```bash
-eaa-pi serve --workspace /path/to/workspace
+export MY_AI_API_KEY='YOUR_API_KEY'
 ```
 
-Native execution has the permissions of your operating-system account. The supplied container configuration provides a filesystem boundary for the server and all agent descendants. The service defaults to local, single-user access.
+This setting lasts for the current terminal session. For other services, login methods, or models that accept images, follow the [provider configuration guide](docs/configuration.md#real-provider-authentication).
 
-## Use Pi's terminal interface
+### 3. Choose the default provider and model
 
-Launch the installed experiment-ops TUI in your workspace:
+Next, open `.pi-experiment-ops/agent/settings.json`. Add or update these two fields inside its outer braces, keeping the other settings:
 
-```bash
-eaa-pi pi --workspace /path/to/workspace -- --provider argo --model gpt55
+```json
+{
+  "defaultProvider": "my-provider",
+  "defaultModel": "YOUR_MODEL_ID"
+}
 ```
 
-Replace `argo` and `gpt55` with a provider/model configured in `.pi-experiment-ops/agent`. The command delegates to the installed `pi-experiment-ops` launcher, including its native terminal extensions. The TUI and WebUI share primary sessions; use one interface per session at a time. See [TUI and CLI usage](docs/installation.md#pi-tui-and-cli-passthrough) for configuration details.
+Use the same provider name and model ID as in step 2. Separate each setting with a comma, but leave no comma after the last setting. Because both interfaces read this file, your choice applies to the terminal and the browser.
 
-## Workspace skills
+### 4. Add an MCP server (optional)
 
-Initialization creates `<workspace>/.pi/skills`. Put each skill in `.pi/skills/<name>/SKILL.md`, for example:
+An **MCP server** connects the assistant to external tools, such as an instrument controller or a data service. You can skip this step if you only want to chat or work with local files.
+
+For a server that is already running at a web address, open `.pi/mcp.json` and add its connection:
+
+```json
+{
+  "mcpServers": {
+    "my-instrument": {
+      "url": "http://YOUR_SERVER_ADDRESS:9001/mcp",
+      "directTools": true,
+      "lifecycle": "eager"
+    }
+  }
+}
+```
+
+Replace the URL with the address supplied by the server's administrator. The other settings make its tools available when EAA Pi starts. If you already have servers in this file, keep their entries. For servers launched by a local command, see the [MCP setup guide](docs/configuration.md#mcp-setup).
+
+### 5. Add skills (optional)
+
+A **skill** is a set of written instructions for a recurring task. Put each skill in its own folder under `.pi/skills`. For example, create `.pi/skills/analyze-data/SKILL.md` with:
 
 ```markdown
 ---
 name: analyze-data
 description: Analyze experimental data in this workspace
 ---
-Read the data and summarize the findings.
+Read the data, explain the analysis, and summarize the findings.
 ```
 
-Restart eaa-pi after adding skills, then enter `/skill:analyze-data` to load one explicitly. To expose a skill for automatic discovery by the agent, allow it in `.pi-experiment-ops/agent/pi-permissions.jsonc`. The WebUI and experiment-ops TUI both load this directory alongside bundled skills.
+After launching EAA Pi, enter `/skill:analyze-data` in the conversation to use it. If EAA Pi is already running when you add a skill, restart it first. To let the assistant discover a skill automatically, allow it in `.pi-experiment-ops/agent/pi-permissions.jsonc`; see the [workspace configuration guide](docs/configuration.md#workspace).
+
+### 6. Launch the terminal interface (TUI)
+
+To chat directly in your terminal, run:
+
+```bash
+eaa-pi pi --workspace ~/eaa-workspace
+```
+
+This uses the provider and model you selected above. Type a request to begin.
+
+### 7. Launch the web interface (WebUI)
+
+To work in your browser, close the terminal interface and run:
+
+```bash
+eaa-pi serve --workspace ~/eaa-workspace
+```
+
+Then open **http://127.0.0.1:8010** in a browser on the same computer. Keep the terminal running while you use the WebUI; press **Ctrl+C** there to stop it.
+
+The two interfaces share conversations and settings, so use one at a time for a workspace. Restart EAA Pi after changing provider settings or MCP connections.
 
 ## Guides
 
-- [Installation, packaging, upgrades, and uninstall](docs/installation.md)
-- [Configuration, authentication, and MCP](docs/configuration.md)
-- [Frontend, sessions, jobs, interactive shells, and recovery](docs/usage.md)
-- [Workflow authoring and toy example](docs/workflows.md)
-- [Containers and execution policy](docs/security.md)
-- [Repository separation and bundle upgrades](docs/repositories.md)
-- [Architecture and HTTP/SSE API](docs/architecture.md)
-- [Compatibility and capability validation](docs/validation.md)
-- [Upstream provenance and notices](THIRD_PARTY.md)
-
-## Development and verification
-
-To test changes in a sibling `pi-experiment-ops` checkout without repacking it, use the [local development link](docs/repositories.md#developing-both-repositories-together). Restart EAA after bundle code changes; the saved release dependency remains pinned.
-
-```bash
-npm run check
-npm run build
-npm test
-PLAYWRIGHT_BROWSERS_PATH="$PWD/.runtime/browsers" npx playwright install chromium
-npm run test:browser
-npm run test:package
-npm run test:container
-```
-
-The acceptance suite exercises installed Pi packages and actual pi-subagents workflows. The deterministic provider tests transport, tool calls, images, orchestration, persistence, and policy enforcement; optional live-provider validation is described separately in the validation guide.
+- [Installation, upgrades, and troubleshooting](docs/installation.md)
+- [Workspace settings, AI providers, and MCP connections](docs/configuration.md)
+- [Using conversations, tools, and background tasks](docs/usage.md)
+- [Creating workflows and trying the toy example](docs/workflows.md)
+- [Permissions and running in a container](docs/security.md)
+- [Developing EAA Pi and pi-experiment-ops together](docs/repositories.md)
+- [How the application works and its API](docs/architecture.md)
+- [Testing and supported features](docs/validation.md)
+- [Included software and licenses](THIRD_PARTY.md)

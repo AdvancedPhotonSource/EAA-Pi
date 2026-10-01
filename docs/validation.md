@@ -37,7 +37,19 @@ The acceptance tests use a deterministic local OpenAI-compatible streaming endpo
 
 ## Reproduction and results
 
-Run the README's check/build/test commands from this repository. Tests create isolated temporary workspaces and leave them for inspection. Package acceptance installs the tarball outside the checkout and runs the shipped installer twice, startup, streaming chat, frontend assets, extension loading, and an actual toy workflow. Container acceptance prints its retained host test directory. Browser failures retain a Playwright trace.
+Run these commands from the source repository to check changes:
+
+```bash
+npm run check
+npm run build
+npm test
+PLAYWRIGHT_BROWSERS_PATH="$PWD/.runtime/browsers" npx playwright install chromium
+npm run test:browser
+npm run test:package
+npm run test:container
+```
+
+Tests create isolated temporary workspaces and leave them for inspection. Package acceptance installs the tarball outside the checkout and runs the shipped installer twice, startup, streaming chat, frontend assets, extension loading, and an actual toy workflow. Container acceptance prints its retained host test directory. Browser failures retain a Playwright trace.
 
 Workflow migration validation for `pi-experiment-ops` 0.5.0 on 2026-09-28:
 

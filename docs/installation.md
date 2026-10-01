@@ -155,4 +155,4 @@ To uninstall, stop the application and remove its installation directory and lau
 | Empty model list / rejected model request | Verify workspace provider/model identifiers and authentication. |
 | Port in use | Select `--port 8020`, or stop the previous instance. |
 | Origin or Host rejected | Access the local URL directly; the supplied service is not configured as an authenticated reverse-proxy service. |
-| Playwright executable missing | Run the Chromium installation command in the README. |
+| Playwright executable missing | Run the Chromium installation command in the [validation guide](validation.md#reproduction-and-results). |
