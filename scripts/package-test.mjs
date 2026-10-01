@@ -5,11 +5,14 @@ import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
 
 const source = resolve(import.meta.dirname, "..");
+const manifest = JSON.parse(readFileSync(join(source, "package.json"), "utf8"));
+const bundle = manifest.dependencies["pi-experiment-ops"].replace(/^file:/, "");
 const target = mkdtempSync(join(tmpdir(), "eaa-pi-package-"));
 const run = (command, args, cwd = target) => execFileSync(command, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 16 * 1024 * 1024 });
 console.log(`Packing application for ${target}`);
 const packed = JSON.parse(run("npm", ["pack", "--json", "--pack-destination", target], source))[0];
 assert.ok(packed.bundled.includes("pi-experiment-ops"));
+assert.deepEqual(packed.files.filter(file => file.path.startsWith("vendor/")).map(file => file.path), [bundle], "Package only the selected Pi release archive");
 console.log("Installing packaged application");
 const prefix = join(target, "installation ' directory"), bin = join(target, "bin ' directory");
 const home = join(target, "home");
@@ -26,7 +29,7 @@ assert.equal(existsSync(join(root, ".demo")), false, "Installation must not crea
 const piPackages = globSync("node_modules/**/@earendil-works/pi-coding-agent/package.json", { cwd: root });
 assert.equal(piPackages.length, 1, "Packaged eaa-pi must install exactly one Pi package through experiment-ops");
 assert.ok(existsSync(join(root, "dist/webui/index.html")));
-for (const file of ["public/mathjax/LICENSE", "README.md", "THIRD_PARTY.md", "docs/installation.md", "docs/architecture.md", "docs/validation.md", "examples/config/eaa-pi.json", "vendor/pi-experiment-ops-0.6.2.tgz", "npm-shrinkwrap.json", "install.sh", "Dockerfile", "compose.yaml"]) assert.ok(existsSync(join(root, file)), `Missing packaged resource: ${file}`);
+for (const file of ["public/mathjax/LICENSE", "README.md", "THIRD_PARTY.md", "docs/installation.md", "docs/architecture.md", "docs/validation.md", "examples/config/eaa-pi.json", bundle, "npm-shrinkwrap.json", "install.sh", "Dockerfile", "compose.yaml"]) assert.ok(existsSync(join(root, file)), `Missing packaged resource: ${file}`);
 console.log("Provisioning packaged runtime and checking installer idempotency");
 const workspace = join(target, "workspace");
 run(launcher, ["init", "--workspace", workspace]);

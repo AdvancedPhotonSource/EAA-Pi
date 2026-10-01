@@ -24,7 +24,7 @@
     "Dockerfile",
     "compose.yaml",
     ".dockerignore",
-    "vendor"
+    "vendor/pi-experiment-ops-0.6.2.tgz"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc --noEmit -p webui/tsconfig.json && vite build --config webui/vite.config.ts",

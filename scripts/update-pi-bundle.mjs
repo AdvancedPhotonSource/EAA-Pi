@@ -14,5 +14,7 @@ const destination = join(root, 'vendor', filename);
 if (tarball !== destination) cpSync(tarball, destination);
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 pkg.dependencies['pi-experiment-ops'] = `file:vendor/${filename}`;
+pkg.files = pkg.files.filter(path => path !== 'vendor' && !path.startsWith('vendor/'));
+pkg.files.push(`vendor/${filename}`);
 writeFileSync(join(root, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
 console.log(`Selected ${basename(destination)}. Run npm install --legacy-peer-deps, then npm install --package-lock-only --ignore-scripts --legacy-peer-deps to complete optional dependency metadata, then all acceptance checks.`);

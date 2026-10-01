@@ -5431,7 +5431,7 @@
     "node_modules/pi-experiment-ops": {
       "version": "0.6.2",
       "resolved": "file:vendor/pi-experiment-ops-0.6.2.tgz",
-      "integrity": "sha512-Tbtboti9LDvcPIne9Yb4J37gU1TiGmLJHKu/t49kOxcr///NaX22qdEkbY3rbhyw4q4txpmIpHbaNL/GXezYsA==",
+      "integrity": "sha512-JVjRORL3vPjwKEiu+EXdn9sbMs619FXAf1PbY9AXPEnhvR4xl+PGnpuj9n/Q9Bu1RUwSCQfAxyIzwhDgzfZKsg==",
       "bundleDependencies": [
         "pi-mcp-adapter",
         "pi-subagents",

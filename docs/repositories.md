@@ -13,7 +13,7 @@
 
 The bundle API exposes resource paths, executables, workspace setup, and Pi-loadable upstream wrapper APIs. EAA replaces the policy, MCP, terminal, and archive entries, and wraps CodeMode when the bundle includes it to track background cells in the execution queue. The subagent child observer remains an EAA adapter because it creates frontend conversation relationships. Native terminal behavior is retained in the standalone bundle.
 
-EAA includes `vendor/pi-experiment-ops-0.6.1.tgz` and declares it as a `file:vendor/...` dependency. This is a release artifact with integrity recorded by npm, not a link to another checkout. npm bundles the installed dependency and its runtime dependencies in the application tarball. The prepack hook gives installed hard-linked files independent inodes, preserving their bytes and modes, so npm can extract bundled executables reliably. Docker builds copy the vendored release before installing. Both source and tarball installation work when the separate bundle source repository is absent.
+EAA includes `vendor/pi-experiment-ops-0.6.2.tgz` and declares it as a `file:vendor/...` dependency. This is a release artifact with integrity recorded by npm, not a link to another checkout. npm bundles the installed dependency and its runtime dependencies in the application tarball. The prepack hook gives installed hard-linked files independent inodes, preserving their bytes and modes, so npm can extract bundled executables reliably. Docker builds copy the vendored release before installing. Both source and tarball installation work when the separate bundle source repository is absent.
 
 ## Developing both repositories together
 
@@ -55,6 +55,6 @@ npm run test:package
 npm run test:container
 ```
 
-Remove superseded vendored tarballs after verifying the new release; retain released artifacts elsewhere for rollback. The application imports `pi-experiment-ops/sdk`; the bundle owns the Pi dependency and version. Once published, a registry version can replace the vendored dependency without changing the runtime API. Registry publication is a separate release action.
+The update script selects the current archive for packaging while preserving older local archives for rollback. The application imports `pi-experiment-ops/sdk`; the bundle owns the Pi dependency and version. Once published, a registry version can replace the vendored dependency without changing the runtime API. Registry publication is a separate release action.
 
 Backend workspace paths come from the bundle's `workspacePaths()` helper; browser metadata stays under `.eaa-pi`. Initialization preserves existing workflow definitions and settings. Fresh workspaces obtain the toy workflow from the installed bundle. Existing YAML workflows require conversion to pi-subagents resource modules.
