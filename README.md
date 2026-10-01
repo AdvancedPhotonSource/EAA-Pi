@@ -52,7 +52,7 @@ eaa-pi init --workspace ~/eaa-workspace
 cd ~/eaa-workspace
 ```
 
-Initialization creates the configuration files and an empty skills folder. You can also point it at an existing pi-experiment-ops workspace, since the two applications share their settings. Running `init` again preserves existing configuration.
+Initialization creates the configuration files and a skills folder containing `workspace-setup`, which teaches the agent to add tools and skills when you ask. You can also point it at an existing pi-experiment-ops workspace, since the two applications share their settings. Running `init` again preserves existing configuration.
 
 The remaining file paths are relative to this workspace. Folders whose names begin with a dot, such as `.pi`, may be hidden in your file manager; enable “Show hidden files” to see them.
 
@@ -66,7 +66,7 @@ Run the guided setup:
 eaa-pi config --workspace ~/eaa-workspace
 ```
 
-It asks for your provider, model, and web interface port. Choose `argo` for Argonne's Argo service, or `openai` for a service with an OpenAI-compatible chat API. If your provider needs an API key, setup asks for the name of an environment variable that holds it and shows you how to set that variable before launching EAA Pi.
+It uses pi-experiment-ops' shared setup for your provider and model, and also asks for the web interface port. Choose `argo` for Argonne's Argo service, or `openai` for a service with an OpenAI-compatible chat API. If your provider needs an API key, setup asks for the name of an environment variable that holds it and shows you how to set that variable before launching EAA Pi.
 
 Setup also offers to add an MCP server and copy a skill. You can skip both and add them later using steps 4 and 5. Existing settings are preserved unless you choose to update them. For other provider types or manual editing, see the [provider configuration guide](docs/configuration.md#real-provider-authentication).
 
@@ -117,7 +117,7 @@ description: Analyze experimental data in this workspace
 Read the data, explain the analysis, and summarize the findings.
 ```
 
-After launching EAA Pi, enter `/skill:analyze-data` in the conversation to use it. If EAA Pi is already running when you add a skill, restart it first. To let the assistant discover a skill automatically, allow it in `.pi-experiment-ops/agent/pi-permissions.jsonc`; see the [workspace configuration guide](docs/configuration.md#workspace).
+After launching EAA Pi, enter `/skill:analyze-data` in the conversation to use it. If EAA Pi is already running when you add a skill, restart it first. To allow agents to auto-discover skills, ensure `defaultPolicy.skills` is set to `"allow"` in `.pi-experiment-ops/agent/pi-permissions.jsonc` (this should be set automatically). See the [workspace configuration guide](docs/configuration.md#workspace).
 
 ### 6. Launch the terminal interface (TUI)
 

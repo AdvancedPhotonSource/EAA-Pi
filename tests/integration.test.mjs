@@ -52,7 +52,10 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
   await t.test("workspace skills appear alongside bundled skills", async () => {
     const { skills } = await request("/api/skill-catalog");
     assert.ok(skills.some(skill => skill.name === "workspace-check" && skill.description === "Check workspace data"));
+    assert.ok(skills.some(skill => skill.name === "workspace-setup"));
     assert.ok(skills.length > 1);
+    const visible = await runtime.session.extensionRunner.emitBeforeAgentStart("hello", undefined, runtime.session.systemPrompt, {});
+    assert.match(visible?.systemPrompt ?? runtime.session.systemPrompt, /workspace-setup/);
     await prompt("/skill:workspace-check");
     assert.ok(runtime.session.messages.some(message => message.role === "user" && JSON.stringify(message.content).includes("Summarize the workspace data.")));
   });

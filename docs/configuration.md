@@ -2,7 +2,7 @@
 
 ## Guided setup
 
-Run `eaa-pi config --workspace /path/to/workspace` for step-by-step setup. If you omit `--workspace`, it uses the current directory. Setup creates missing workspace files, then offers to configure a provider and model, save them as the defaults, choose the WebUI port, and optionally add an MCP server or skill. Press Enter to accept a displayed default; answer no to skip optional steps.
+Run `eaa-pi config --workspace /path/to/workspace` for step-by-step setup. EAA delegates provider, MCP, and skill setup to pi-experiment-ops and adds its own WebUI port prompt. If you omit `--workspace`, it uses the current directory. Setup creates missing workspace files, then offers to configure a provider and model, save them as the defaults, choose the WebUI port, and optionally add an MCP server or skill. Press Enter to accept a displayed default; answer no to skip optional steps.
 
 Provider setup supports Argo and services with an OpenAI-compatible chat API. For Argo, supply your Argonne username and model ID. For other services, supply the base URL and, if needed, the name of an environment variable containing your API key. Setup stores the variable reference, so set its value in the terminal before launching EAA Pi. Existing authentication is retained when you leave that prompt blank. Other provider types can be configured manually as described below.
 
@@ -44,10 +44,10 @@ eaa-pi config add-skill /path/to/skill/dir --workspace /path/to/workspace
 | `.pi/archive.db` | Pinned archive's searchable transcript index |
 | `.pi/mcp.json` | Explicit MCP server configuration |
 | `.pi/agents/reviewer.md` | Toy ad hoc reviewer definition |
-| `.pi/skills/` | User skills, each in `<name>/SKILL.md`; created empty by initialization |
+| `.pi/skills/` | Workspace skills, each in `<name>/SKILL.md`; includes `workspace-setup` after initialization |
 | `workflows/toy/` | Editable toy workflow source |
 
-Initialization creates configuration files, including `models.json` with `{ "providers": {} }` and `auth.json` with `{}`, while preserving existing contents. Sessions, logs, databases, and workflow outputs are created when used. Restart the server after adding workspace skills, then invoke them with `/skill:name`. Skills allowed by `pi-permissions.jsonc` are also exposed for automatic discovery by the agent.
+Initialization creates configuration files, including `models.json` with `{ "providers": {} }` and `auth.json` with `{}`, while preserving existing contents. Sessions, logs, databases, and workflow outputs are created when used. Restart the server after adding workspace skills, then invoke them with `/skill:name`. New workspaces set `defaultPolicy.skills` to `"allow"` in `pi-permissions.jsonc`, so skill descriptions are available for automatic selection. Existing permission files are preserved; change that field to `"allow"` to adopt the new default, keeping individual rules and other permission categories. Initialization adds the shared `workspace-setup` skill, which explains direct MCP JSON editing and skill copying when neither CLI is on PATH. Local edits to that skill are preserved.
 
 Global Pi extensions and original EAA configuration are not imported. The host sets `PI_CODING_AGENT_DIR`, `PI_SUBAGENTS_TEMP_ROOT`, and a workspace temporary directory before loading extensions. It explicitly supplies bundle resources with browser-specific entrypoint replacements. Workspace files and descendants still have native filesystem access unless the entire application runs in the container.
 
