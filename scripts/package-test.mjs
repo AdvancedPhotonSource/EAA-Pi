@@ -26,7 +26,7 @@ assert.equal(existsSync(join(root, ".demo")), false, "Installation must not crea
 const piPackages = globSync("node_modules/**/@earendil-works/pi-coding-agent/package.json", { cwd: root });
 assert.equal(piPackages.length, 1, "Packaged eaa-pi must install exactly one Pi package through experiment-ops");
 assert.ok(existsSync(join(root, "dist/webui/index.html")));
-for (const file of ["public/mathjax/LICENSE", "README.md", "THIRD_PARTY.md", "docs/installation.md", "docs/architecture.md", "docs/validation.md", "examples/config/eaa-pi.json", "vendor/pi-experiment-ops-0.6.0.tgz", "npm-shrinkwrap.json", "install.sh", "Dockerfile", "compose.yaml"]) assert.ok(existsSync(join(root, file)), `Missing packaged resource: ${file}`);
+for (const file of ["public/mathjax/LICENSE", "README.md", "THIRD_PARTY.md", "docs/installation.md", "docs/architecture.md", "docs/validation.md", "examples/config/eaa-pi.json", "vendor/pi-experiment-ops-0.6.1.tgz", "npm-shrinkwrap.json", "install.sh", "Dockerfile", "compose.yaml"]) assert.ok(existsSync(join(root, file)), `Missing packaged resource: ${file}`);
 console.log("Provisioning packaged runtime and checking installer idempotency");
 const workspace = join(target, "workspace");
 run(launcher, ["init", "--workspace", workspace]);
