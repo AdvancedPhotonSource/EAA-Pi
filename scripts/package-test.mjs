@@ -26,7 +26,7 @@ assert.equal(existsSync(join(root, ".demo")), false, "Installation must not crea
 const piPackages = globSync("node_modules/**/@earendil-works/pi-coding-agent/package.json", { cwd: root });
 assert.equal(piPackages.length, 1, "Packaged eaa-pi must install exactly one Pi package through experiment-ops");
 assert.ok(existsSync(join(root, "dist/webui/index.html")));
-for (const file of ["public/mathjax/LICENSE", "README.md", "THIRD_PARTY.md", "docs/installation.md", "docs/architecture.md", "docs/validation.md", "examples/config/eaa-pi.json", "vendor/pi-experiment-ops-0.6.1.tgz", "npm-shrinkwrap.json", "install.sh", "Dockerfile", "compose.yaml"]) assert.ok(existsSync(join(root, file)), `Missing packaged resource: ${file}`);
+for (const file of ["public/mathjax/LICENSE", "README.md", "THIRD_PARTY.md", "docs/installation.md", "docs/architecture.md", "docs/validation.md", "examples/config/eaa-pi.json", "vendor/pi-experiment-ops-0.6.2.tgz", "npm-shrinkwrap.json", "install.sh", "Dockerfile", "compose.yaml"]) assert.ok(existsSync(join(root, file)), `Missing packaged resource: ${file}`);
 console.log("Provisioning packaged runtime and checking installer idempotency");
 const workspace = join(target, "workspace");
 run(launcher, ["init", "--workspace", workspace]);
@@ -62,14 +62,14 @@ const until = async predicate => {
 };
 try {
   const url = await until(() => output.match(/listening at (http:\/\/[^\s]+)/)?.[1]);
-  assert.equal((await (await fetch(url + "/api/health")).json()).extensions, 10);
+  assert.equal((await (await fetch(url + "/api/health")).json()).extensions, 11);
   assert.equal((await fetch(url)).status, 200);
   const response = await fetch(url + "/api/input", { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"content":"hello packaged application"}' });
   assert.equal(response.status, 201);
   await until(async () => (await (await fetch(url + "/api/state")).json()).conversations[0].messages.some(m => m.content === "Demo reply: hello packaged application"));
   const workflow = await (await fetch(url + "/api/workflows/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"workflow":"toy","input":"packaged toy"}' })).json();
   await until(async () => (await (await fetch(url + "/api/workflows")).json()).runs.some(run => run.id === workflow.id && run.status === "completed"));
-  console.log(`Packaged install, idempotent installer, chat, frontend, ten extensions, and subagent workflows passed in ${target}`);
+  console.log(`Packaged install, idempotent installer, chat, frontend, eleven extensions, and subagent workflows passed in ${target}`);
 } finally {
   child.kill("SIGTERM");
   await Promise.race([new Promise(resolve => child.once("exit", resolve)), new Promise(resolve => setTimeout(() => { child.kill("SIGKILL"); resolve(); }, 10000).unref())]);

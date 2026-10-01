@@ -19,6 +19,12 @@ eaa-pi config add-skill /path/to/skill/dir --workspace /path/to/workspace
 
 `add-skill` copies a folder containing `SKILL.md` into `.pi/skills/<folder-name>`, including its supporting files. Omit the source path to enter it at a prompt. Existing destination folders are never overwritten. Restart EAA Pi after adding a skill, then invoke it with `/skill:name`, using the name in its `SKILL.md`.
 
+## Image context budget
+
+The bundled pi-condense extension limits model requests to four recent images across attachments and tool results. It removes older images in batches of two, so an over-budget history retains the latest three or four images. Original images remain in the transcript and gallery; re-read or re-attach an older image when it is needed again.
+
+Workspace initialization supplies `contextPrune.maxImagesPerRequest: 4` in `.pi-experiment-ops/agent/settings.json`, preserving any explicit setting. Change the positive integer and restart EAA Pi to adjust the budget. An explicit `null` uses pi-condense's provider-specific limits. Image capping adds no model calls; its optional LLM tool-output summarizer remains disabled by default.
+
 ## Workspace
 
 `eaa-pi init --workspace DIR` creates an explicit configuration and data root:

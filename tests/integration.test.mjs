@@ -131,6 +131,13 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
     assert.ok(readResult.images?.length);
     assert.doesNotMatch(readResult.content, /Current model does not support images/);
     assert.ok(model.requests.at(-1).messages.some(m => m.role === "user" && Array.isArray(m.content) && m.content.some(block => block.type === "image_url")), "Read-tool image must reach the model");
+    await request("/api/input", { content: "Inspect recent images", images: Array(4).fill(upload.file_path) }, 201);
+    await idle();
+    const capped = model.requests.at(-1).messages;
+    const sentImages = capped.flatMap(m => Array.isArray(m.content) ? m.content.filter(b => b.type === "image_url") : []);
+    assert.equal(sentImages.length, 3, "The four-image budget trims seven images in batches of two");
+    assert.match(JSON.stringify(capped), /earlier image omitted/);
+    assert.equal(runtime.snapshot.conversations[0].messages.reduce((count, m) => count + (m.images?.length ?? 0), 0), 7, "Pruning preserves all images in the UI history");
     assert.equal((await fetch(app.url + "/api/image?path=" + encodeURIComponent(upload.file_path))).status, 200);
     assert.equal((await fetch(app.url + "/api/image?path=/etc/passwd")).status, 404);
     assert.equal((await fetch(app.url + "/api/image?path=../../etc/passwd")).status, 404);

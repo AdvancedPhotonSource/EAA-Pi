@@ -48,7 +48,7 @@ test("WebUI uses native model defaults without rewriting shared provider configu
   assert.deepEqual(JSON.parse(readFileSync(join(agentDir(workspace), "auth.json"))), {});
   const settings = join(agentDir(workspace), "settings.json");
   const models = join(agentDir(workspace), "models.json");
-  writeJson(settings, { theme: "light", defaultProvider: "native", defaultModel: "vision" });
+  writeJson(settings, { theme: "light", defaultProvider: "native", defaultModel: "vision", contextPrune: { maxImagesPerRequest: 4 } });
   writeJson(models, { providers: { native: { baseUrl: "http://localhost:9000/v1", api: "openai-completions", apiKey: "fixture", models: [{ id: "vision", input: ["text", "image"] }, { id: "text", input: ["text"] }] } } });
   const before = [settings, models].map(path => readFileSync(path, "utf8"));
   initialize(workspace);
