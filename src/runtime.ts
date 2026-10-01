@@ -89,7 +89,7 @@ export class Runtime extends EventEmitter {
       cwd: this.workspace, agentDir: agentDir(this.workspace), settingsManager: this.settings, eventBus: this.bus,
       noExtensions: true, noSkills: true, noContextFiles: true, noPromptTemplates: true, noThemes: true,
       additionalExtensionPaths: paths.extensions,
-      additionalSkillPaths: paths.skills,
+      additionalSkillPaths: [...paths.skills, join(this.workspace, ".pi/skills")],
       systemPrompt: "You are EAA, an assistant powered by Pi. Use the available tools for the user's work. Delegate with subagent when useful. Use process for background scripts and interactive_shell in background dispatch mode for persistent terminals. Keep responses concise.",
     });
     await this.loader.reload();

@@ -25,7 +25,10 @@
 | `.pi/archive.db` | Pinned archive's searchable transcript index |
 | `.pi/mcp.json` | Explicit MCP server configuration |
 | `.pi/agents/reviewer.md` | Toy ad hoc reviewer definition |
+| `.pi/skills/` | User skills, each in `<name>/SKILL.md`; created empty by initialization |
 | `workflows/toy/` | Editable toy workflow source |
+
+Initialization creates configuration files, including `models.json` with `{ "providers": {} }` and `auth.json` with `{}`, while preserving existing contents. Sessions, logs, databases, and workflow outputs are created when used. Restart the server after adding workspace skills, then invoke them with `/skill:name`. Skills allowed by `pi-permissions.jsonc` are also exposed for automatic discovery by the agent.
 
 Global Pi extensions and original EAA configuration are not imported. The host sets `PI_CODING_AGENT_DIR`, `PI_SUBAGENTS_TEMP_ROOT`, and a workspace temporary directory before loading extensions. It explicitly supplies bundle resources with browser-specific entrypoint replacements. Workspace files and descendants still have native filesystem access unless the entire application runs in the container.
 

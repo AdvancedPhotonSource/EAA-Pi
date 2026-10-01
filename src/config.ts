@@ -71,10 +71,15 @@ export function migrateLegacyConfiguration(workspace: string) {
   mkdirSync(target, { recursive: true });
   const settingsPath = join(target, "settings.json");
   const settings = existsSync(settingsPath) ? readJson<Record<string, any>>(settingsPath) : {};
-  const hasNativeProvider = settings.defaultProvider || settings.defaultModel || ["models.json", "auth.json"].some(name => existsSync(join(target, name)));
+  const hasNativeProvider = settings.defaultProvider || settings.defaultModel || ["models.json", "auth.json"].some(name => {
+    const path = join(target, name);
+    if (!existsSync(path)) return false;
+    const config = readJson<Record<string, any>>(path);
+    return Object.keys(name === "models.json" ? config.providers ?? {} : config).length > 0;
+  });
   if (!hasNativeProvider) for (const name of ["models.json", "auth.json"]) {
     const from = join(legacy, name), to = join(target, name);
-    if (existsSync(from)) copyFileSync(from, to, constants.COPYFILE_EXCL);
+    if (existsSync(from)) copyFileSync(from, to);
   }
   let changed = false;
   for (const [old, key] of [["provider", "defaultProvider"], ["model", "defaultModel"]]) {

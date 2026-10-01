@@ -38,6 +38,8 @@ If the workspace is already configured for experiment-ops, its provider settings
 
 See [configuration and authentication](docs/configuration.md#real-provider-authentication) for custom endpoints and legacy workspace migration.
 
+Initialization creates the documented configuration files, including `.pi-experiment-ops/agent/models.json` with `{ "providers": {} }` and `auth.json` with `{}`. Rerunning `init` fills in missing files and preserves existing contents. Sessions, logs, databases, and workflow outputs are created when used.
+
 Then start EAA:
 
 ```bash
@@ -55,6 +57,20 @@ eaa-pi pi --workspace /path/to/workspace -- --provider argo --model gpt55
 ```
 
 Replace `argo` and `gpt55` with a provider/model configured in `.pi-experiment-ops/agent`. The command delegates to the installed `pi-experiment-ops` launcher, including its native terminal extensions. The TUI and WebUI share primary sessions; use one interface per session at a time. See [TUI and CLI usage](docs/installation.md#pi-tui-and-cli-passthrough) for configuration details.
+
+## Workspace skills
+
+Initialization creates `<workspace>/.pi/skills`. Put each skill in `.pi/skills/<name>/SKILL.md`, for example:
+
+```markdown
+---
+name: analyze-data
+description: Analyze experimental data in this workspace
+---
+Read the data and summarize the findings.
+```
+
+Restart eaa-pi after adding skills, then enter `/skill:analyze-data` to load one explicitly. To expose a skill for automatic discovery by the agent, allow it in `.pi-experiment-ops/agent/pi-permissions.jsonc`. The WebUI and experiment-ops TUI both load this directory alongside bundled skills.
 
 ## Guides
 

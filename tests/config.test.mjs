@@ -43,6 +43,9 @@ test("WebUI uses native model defaults without rewriting shared provider configu
   t.after(() => rmSync(workspace, { recursive: true, force: true }));
   assert.deepEqual(JSON.parse(readFileSync(join(workspace, "eaa-pi.json"))), { host: "127.0.0.1", port: 8010 });
   assert.equal(existsSync(join(workspace, ".eaa-pi/agent/models.json")), false);
+  assert.ok(statSync(join(workspace, ".pi/skills")).isDirectory());
+  assert.deepEqual(JSON.parse(readFileSync(join(agentDir(workspace), "models.json"))), { providers: {} });
+  assert.deepEqual(JSON.parse(readFileSync(join(agentDir(workspace), "auth.json"))), {});
   const settings = join(agentDir(workspace), "settings.json");
   const models = join(agentDir(workspace), "models.json");
   writeJson(settings, { theme: "light", defaultProvider: "native", defaultModel: "vision" });
@@ -73,7 +76,7 @@ test("legacy EAA provider configuration migrates once into the native workspace"
   assert.deepEqual(JSON.parse(readFileSync(join(workspace, "eaa-pi.json"))), { port: 8123 });
   rmSync(join(agentDir(workspace), "auth.json"));
   initialize(workspace);
-  assert.equal(existsSync(join(agentDir(workspace), "auth.json")), false, "Removed credentials must not reappear from legacy files");
+  assert.deepEqual(JSON.parse(readFileSync(join(agentDir(workspace), "auth.json"))), {}, "Removed credentials must not reappear from legacy files");
 });
 
 test("legacy migration preserves established experiment-ops configuration", t => {

@@ -19,6 +19,9 @@ const wait = async (fn, timeout = 20000) => {
 for (const providerSource of ["native", "legacy"]) test(`real Pi and community extensions through EAA's HTTP interface (${providerSource} provider)`, { timeout: 240000 }, async t => {
   const cwd = process.cwd();
   const workspace = initialize(mkdtempSync(join(tmpdir(), "eaa-pi-integration-")));
+  const skillDir = join(workspace, ".pi/skills/workspace-check");
+  mkdirSync(skillDir);
+  writeFileSync(join(skillDir, "SKILL.md"), "---\nname: workspace-check\ndescription: Check workspace data\n---\nSummarize the workspace data.\n");
   configureEnvironment(workspace);
   const model = await startModelFixture();
   const instrument = await startInstrumentFixture();
@@ -45,6 +48,14 @@ for (const providerSource of ["native", "legacy"]) test(`real Pi and community e
   const idle = () => wait(() => !runtime.busy && !runtime.session.isStreaming);
   const prompt = async content => { await request("/api/input", { content }, 201); await idle(); };
   t.after(async () => { await app.close(); await model.close(); await instrument.close(); process.chdir(cwd); });
+
+  await t.test("workspace skills appear alongside bundled skills", async () => {
+    const { skills } = await request("/api/skill-catalog");
+    assert.ok(skills.some(skill => skill.name === "workspace-check" && skill.description === "Check workspace data"));
+    assert.ok(skills.length > 1);
+    await prompt("/skill:workspace-check");
+    assert.ok(runtime.session.messages.some(message => message.role === "user" && JSON.stringify(message.content).includes("Summarize the workspace data.")));
+  });
 
   await t.test("workflow catalog and explicit selection", async () => {
     assert.deepEqual((await request("/api/workflows")).workflows, ["toy"]);

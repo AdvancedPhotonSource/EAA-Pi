@@ -9,7 +9,7 @@ The acceptance tests use a deterministic local OpenAI-compatible streaming endpo
 | Native platform | Linux, Node ≥22.19 | Host tested with Node 24.5 |
 | Container | Node 22.19.0, Debian Bookworm, non-root | Rootless Podman execution |
 | Python | 3.12, hashed lock | Tested 3.12.11 |
-| Pi distribution | pi-experiment-ops 0.5.0 | Independent CLI/resources/Python installer; versioned tarball dependency |
+| Pi distribution | pi-experiment-ops 0.5.1 | Independent CLI/resources/Python installer; versioned tarball dependency |
 | Pi SDK/CLI | 0.85.1 | SDK sessions, streaming, tools, CLI children, session files |
 | MCP | pi-mcp-adapter 2.34.0 | Factory, direct tools, images, status, metadata trace |
 | Children | pi-subagents 0.68.0 | Public spawn/status/steer/stop RPC and required-child extensions |
