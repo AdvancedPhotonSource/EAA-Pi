@@ -16,6 +16,7 @@
     "public",
     "examples",
     "scripts",
+    "install.sh",
     "docs",
     "README.md",
     "THIRD_PARTY.md",

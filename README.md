@@ -2,7 +2,26 @@
 
 EAA's React control center, backed by Pi and community extensions. This repository owns the frontend, MathJax assets, HTTP/SSE adapter, and browser extension bridges. It consumes the independently installable **pi-experiment-ops** bundle for Pi, community resources, Python provisioning, and the toy workflow. A versioned bundle tarball is included in `vendor/`, so installation needs no sibling checkout.
 
-## Quickstart
+## Install a release
+
+On Linux, install Node.js **22.19 or newer**, npm, Git, Bash, [uv](https://docs.astral.sh/uv/getting-started/installation/), curl, tar, and sha256sum. For a published release with package assets:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AdvancedPhotonSource/EAA-Pi/v0.1.0/install.sh | \
+  sh -s -- --version 0.1.0
+```
+
+The installer verifies the release checksum, installs under `~/.local/share/eaa-pi`, provisions Python, and creates `~/.local/bin/eaa-pi`. It adds the launcher directory to your Bash or Zsh startup file. Open a new terminal, or run the `source` command printed by the installer, then choose your workspace:
+
+```bash
+eaa-pi init --workspace /path/to/workspace
+# Configure the provider in this workspace, then start the WebUI.
+eaa-pi serve --workspace /path/to/workspace
+```
+
+An existing experiment-ops workspace uses its saved provider settings. Otherwise follow [provider configuration](docs/configuration.md#real-provider-authentication). Installation creates no workspace; use `--workspace DIR` or run `eaa-pi serve` from your workspace directory. See [release installation](docs/installation.md#release-installation) for local archives, upgrades, and installation paths.
+
+## Source quickstart
 
 Requirements: native Linux, Node.js **22.19 or newer**, Git, Bash, and [uv](https://docs.astral.sh/uv/getting-started/installation/). The installer provisions Python 3.12 and the locked Python dependencies. A C/C++ toolchain may be needed if a PTY binary is unavailable for your platform.
 

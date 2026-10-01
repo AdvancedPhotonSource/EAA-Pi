@@ -1,0 +1,113 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const installer = readFileSync(new URL("../install.sh", import.meta.url), "utf8");
+
+test("piped release installation preserves workspace choice and the last working launcher", t => {
+  const target = mkdtempSync(join(tmpdir(), "eaa-pi-installer-"));
+  t.after(() => rmSync(target, { recursive: true, force: true }));
+  const fixtures = join(target, "fixtures"), tools = join(target, "tools");
+  const home = join(target, "home"), cwd = join(target, "chosen workspace");
+  const prefix = join(target, "installed ' package"), bin = join(target, "launcher ' directory");
+  for (const path of [fixtures, tools, home, cwd]) mkdirSync(path);
+  const write = (path, text) => writeFileSync(path, text, { mode: 0o755 });
+  write(join(home, ".profile"), "# preserve my profile\n");
+  write(join(home, ".bashrc"), "# preserve my bash settings");
+  write(join(cwd, "eaa-pi.json"), '{"port":8123}\n');
+  // Replace downloads and npm installation with a small local release fixture.
+  write(join(tools, "curl"), `#!${process.execPath}
+import { copyFileSync } from 'node:fs';
+import { join, basename } from 'node:path';
+const args = process.argv.slice(2);
+const url = args.find(arg => arg.startsWith('https://'));
+if (!url?.startsWith('https://github.com/AdvancedPhotonSource/EAA-Pi/releases/download/v')) process.exit(2);
+copyFileSync(join(process.env.INSTALL_FIXTURES, basename(url)), args[args.indexOf('-o') + 1]);
+`);
+  write(join(tools, "npm"), `#!${process.execPath}
+import { mkdirSync, appendFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+const args = process.argv.slice(2);
+const root = join(args[args.indexOf('--prefix') + 1], 'node_modules/eaa-pi');
+mkdirSync(root, {recursive:true});
+execFileSync('tar', ['-xzf', args.at(-1), '--strip-components=1', '-C', root]);
+appendFileSync(process.env.INSTALL_CALLS, 'install\\n');
+`);
+  write(join(tools, "uv"), "#!/bin/sh\nexit 0\n");
+  const env = { ...process.env, HOME: home, SHELL: "/bin/bash", PATH: `${tools}:${process.env.PATH}`, INSTALL_FIXTURES: fixtures, INSTALL_CALLS: join(target, "npm-calls") };
+  const makeRelease = (version, failure = false) => {
+    const packageDir = join(target, `source-${version}`, "package");
+    for (const dir of ["scripts", "bin", "dist/webui"]) mkdirSync(join(packageDir, dir), { recursive: true });
+    write(join(packageDir, "package.json"), JSON.stringify({ name: "eaa-pi", version, type: "module" }));
+    write(join(packageDir, "dist/webui/index.html"), "fixture");
+    write(join(packageDir, "scripts/install.sh"), `#!/bin/sh\n[ "$1" = --runtime-only ] || exit 2\nexit ${failure ? 1 : 0}\n`);
+    write(join(packageDir, "bin/eaa-pi.mjs"), "console.log(JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2)}));\n");
+    const filename = `eaa-pi-${version}.tgz`;
+    const archive = join(fixtures, filename);
+    execFileSync("tar", ["-czf", archive, "-C", join(target, `source-${version}`), "package"]);
+    const hash = createHash("sha256").update(readFileSync(archive)).digest("hex");
+    write(join(fixtures, filename + ".sha256"), `${hash}  ${filename}\n`);
+    return archive;
+  };
+  const run = (...args) => spawnSync("sh", ["-s", "--", "--prefix", prefix, "--bin-dir", bin, ...args], { input: installer, cwd, env, encoding: "utf8", timeout: 30000 });
+  const succeeds = result => assert.equal(result.status, 0, result.stdout + result.stderr);
+  const archive = makeRelease("0.1.0");
+  succeeds(run());
+  const launcher = join(bin, "eaa-pi");
+  const before = readFileSync(launcher, "utf8");
+  succeeds(run("--archive", archive));
+  assert.equal(readFileSync(env.INSTALL_CALLS, "utf8"), "install\n", "Reruns reuse an installed release");
+  const bashrc = readFileSync(join(home, ".bashrc"), "utf8");
+  assert.ok(bashrc.startsWith("# preserve my bash settings\n"));
+  assert.equal(bashrc.split("# eaa-pi PATH").length - 1, 1, "Reruns must not duplicate the profile entry");
+  const checkPath = (shell, profile) => {
+    const result = spawnSync(shell, ["-c", '. "$1"; . "$1"; command -v eaa-pi; printf "%s\\n" "$PATH"', "profile-test", profile], { cwd, env, encoding: "utf8" });
+    succeeds(result);
+    const [command, path] = result.stdout.trim().split("\n");
+    assert.equal(command, launcher);
+    assert.equal(path.split(":").filter(entry => entry === bin).length, 1, "Reloading the profile must not duplicate PATH entries");
+  };
+  checkPath("bash", join(home, ".bashrc"));
+  for (const args of [[], ["serve"], ["serve", "--workspace", join(target, "another ' workspace"), "--port", "8123"]]) {
+    const result = spawnSync(launcher, args, { cwd, env, encoding: "utf8" });
+    succeeds(result);
+    assert.deepEqual(JSON.parse(result.stdout), { cwd, args });
+  }
+  assert.equal(readFileSync(join(home, ".profile"), "utf8"), "# preserve my profile\n");
+  assert.deepEqual(readdirSync(home).sort(), [".bashrc", ".profile"]);
+  env.SHELL = "/bin/zsh";
+  env.ZDOTDIR = join(home, "zsh settings");
+  mkdirSync(env.ZDOTDIR);
+  const zshrc = join(env.ZDOTDIR, ".zshrc");
+  write(zshrc, "# preserve my zsh settings\n");
+  succeeds(run("--archive", archive));
+  succeeds(run("--archive", archive));
+  const zshContents = readFileSync(zshrc, "utf8");
+  assert.ok(zshContents.startsWith("# preserve my zsh settings\n"));
+  assert.equal(zshContents.split("# eaa-pi PATH").length - 1, 1);
+  assert.equal(existsSync(join(home, ".zshrc")), false, "Zsh must respect ZDOTDIR");
+  checkPath("bash", zshrc);
+  if (spawnSync("zsh", ["--version"]).status === 0) checkPath("zsh", zshrc);
+  delete env.ZDOTDIR;
+  succeeds(run("--archive", archive));
+  assert.ok(readFileSync(join(home, ".zshrc"), "utf8").includes("# eaa-pi PATH"));
+  assert.equal(readFileSync(join(home, ".bashrc"), "utf8"), bashrc);
+  assert.equal(readFileSync(join(cwd, "eaa-pi.json"), "utf8"), '{"port":8123}\n');
+  assert.deepEqual(readdirSync(cwd), ["eaa-pi.json"]);
+  write(join(fixtures, "eaa-pi-0.1.0.tgz.sha256"), `${"0".repeat(64)}  eaa-pi-0.1.0.tgz\n`);
+  assert.notEqual(run().status, 0, "A checksum mismatch must reject the download");
+  makeRelease("0.1.1", true);
+  assert.notEqual(run("--version", "0.1.1").status, 0, "Runtime provisioning must succeed before switching launchers");
+  assert.equal(readFileSync(launcher, "utf8"), before);
+  assert.equal(readFileSync(zshrc, "utf8"), zshContents);
+  assert.equal(existsSync(join(prefix, ".install-lock")), false);
+  assert.match(run("--preset", "argo").stderr, /Unknown option/);
+  write(launcher, "#!/bin/sh\n# unrelated executable\n");
+  assert.match(run("--archive", archive).stderr, /Refusing to replace/);
+  assert.match(readFileSync(launcher, "utf8"), /unrelated executable/);
+});

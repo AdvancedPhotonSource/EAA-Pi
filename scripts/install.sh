@@ -8,4 +8,4 @@ if [[ -d src ]]; then npm ci --no-audit --no-fund; elif ! node --input-type=modu
 bundle_root=$(node --input-type=module -e 'import { packageRoot } from "pi-experiment-ops"; console.log(packageRoot)')
 bash "$bundle_root/scripts/install.sh" --runtime-only
 if [[ -d src ]]; then npm run build; fi
-node bin/eaa-pi.mjs doctor --workspace "${1:-$root/.demo}"
+if [[ "${1:-}" != --runtime-only ]]; then node bin/eaa-pi.mjs doctor --workspace "${1:-$root/.demo}"; fi
