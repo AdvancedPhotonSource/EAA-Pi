@@ -60,34 +60,21 @@ The remaining file paths are relative to this workspace. Folders whose names beg
 
 A **provider** is the service that runs your AI model. You need its connection address, the exact model ID, and any required login details or API key. If your workspace already has a working provider, continue to step 3.
 
-For a service that supports the OpenAI-compatible chat API, open `.pi-experiment-ops/agent/models.json` in a text editor and use this starting point:
-
-```json
-{
-  "providers": {
-    "my-provider": {
-      "baseUrl": "https://YOUR_PROVIDER_ADDRESS/v1",
-      "api": "openai-completions",
-      "apiKey": "$MY_AI_API_KEY",
-      "models": [{ "id": "YOUR_MODEL_ID" }]
-    }
-  }
-}
-```
-
-Replace the address and model ID with the values supplied by your provider. `my-provider` is a name you choose for this connection. If the file already lists providers, add your entry inside `providers` while keeping the existing entries.
-
-The example reads your API key from a terminal setting named `MY_AI_API_KEY`. Set it before launching EAA Pi in that terminal:
+Run the guided setup:
 
 ```bash
-export MY_AI_API_KEY='YOUR_API_KEY'
+eaa-pi config --workspace ~/eaa-workspace
 ```
 
-This setting lasts for the current terminal session. For other services, login methods, or models that accept images, follow the [provider configuration guide](docs/configuration.md#real-provider-authentication).
+It asks for your provider, model, and web interface port. Choose `argo` for Argonne's Argo service, or `openai` for a service with an OpenAI-compatible chat API. If your provider needs an API key, setup asks for the name of an environment variable that holds it and shows you how to set that variable before launching EAA Pi.
+
+Setup also offers to add an MCP server and copy a skill. You can skip both and add them later using steps 4 and 5. Existing settings are preserved unless you choose to update them. For other provider types or manual editing, see the [provider configuration guide](docs/configuration.md#real-provider-authentication).
 
 ### 3. Choose the default provider and model
 
-Next, open `.pi-experiment-ops/agent/settings.json`. Add or update these two fields inside its outer braces, keeping the other settings:
+During guided setup, answer yes to “Use this provider and model by default?” Both interfaces will then use your selection.
+
+To change it manually later, open `.pi-experiment-ops/agent/settings.json` and update these fields, keeping the other settings:
 
 ```json
 {
@@ -96,31 +83,31 @@ Next, open `.pi-experiment-ops/agent/settings.json`. Add or update these two fie
 }
 ```
 
-Use the same provider name and model ID as in step 2. Separate each setting with a comma, but leave no comma after the last setting. Because both interfaces read this file, your choice applies to the terminal and the browser.
+Use a provider name and model ID listed in `.pi-experiment-ops/agent/models.json`. Separate each setting with a comma, but leave no comma after the last setting.
 
 ### 4. Add an MCP server (optional)
 
 An **MCP server** connects the assistant to external tools, such as an instrument controller or a data service. You can skip this step if you only want to chat or work with local files.
 
-For a server that is already running at a web address, open `.pi/mcp.json` and add its connection:
+Run:
 
-```json
-{
-  "mcpServers": {
-    "my-instrument": {
-      "url": "http://YOUR_SERVER_ADDRESS:9001/mcp",
-      "directTools": true,
-      "lifecycle": "eager"
-    }
-  }
-}
+```bash
+eaa-pi config add-mcp --workspace ~/eaa-workspace
 ```
 
-Replace the URL with the address supplied by the server's administrator. The other settings make its tools available when EAA Pi starts. If you already have servers in this file, keep their entries. For servers launched by a local command, see the [MCP setup guide](docs/configuration.md#mcp-setup).
+The prompts guide you through naming the server, choosing how to connect, and supplying its address or launch command. For a web server, you can also configure authentication and any required headers. For a local program, enter its arguments one at a time. Setup saves the connection in `.pi/mcp.json`; restart EAA Pi to use it. See the [MCP setup guide](docs/configuration.md#mcp-setup) for details.
 
 ### 5. Add skills (optional)
 
-A **skill** is a set of written instructions for a recurring task. Put each skill in its own folder under `.pi/skills`. For example, create `.pi/skills/analyze-data/SKILL.md` with:
+A **skill** is a set of written instructions for a recurring task. To add a skill you have downloaded or written, run:
+
+```bash
+eaa-pi config add-skill /path/to/skill/dir --workspace ~/eaa-workspace
+```
+
+You can leave out the path and enter it when asked. The command copies the entire folder into `.pi/skills`, including supporting files. The folder must contain `SKILL.md`; an existing skill folder with the same name is kept unchanged.
+
+You can also create a skill directly. For example, write `.pi/skills/analyze-data/SKILL.md` with:
 
 ```markdown
 ---
@@ -150,7 +137,7 @@ To work in your browser, close the terminal interface and run:
 eaa-pi serve --workspace ~/eaa-workspace
 ```
 
-Then open **http://127.0.0.1:8010** in a browser on the same computer. Keep the terminal running while you use the WebUI; press **Ctrl+C** there to stop it.
+Then open **http://127.0.0.1:8010** in a browser on the same computer, or use the address printed in the terminal if you chose a different port. Keep the terminal running while you use the WebUI; press **Ctrl+C** there to stop it.
 
 The two interfaces share conversations and settings, so use one at a time for a workspace. Restart EAA Pi after changing provider settings or MCP connections.
 

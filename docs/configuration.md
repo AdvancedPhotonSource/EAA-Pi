@@ -1,5 +1,24 @@
 # Configuration, providers, and MCP
 
+## Guided setup
+
+Run `eaa-pi config --workspace /path/to/workspace` for step-by-step setup. If you omit `--workspace`, it uses the current directory. Setup creates missing workspace files, then offers to configure a provider and model, save them as the defaults, choose the WebUI port, and optionally add an MCP server or skill. Press Enter to accept a displayed default; answer no to skip optional steps.
+
+Provider setup supports Argo and services with an OpenAI-compatible chat API. For Argo, supply your Argonne username and model ID. For other services, supply the base URL and, if needed, the name of an environment variable containing your API key. Setup stores the variable reference, so set its value in the terminal before launching EAA Pi. Existing authentication is retained when you leave that prompt blank. Other provider types can be configured manually as described below.
+
+Settings are saved after each completed step. Updating an existing provider requires confirmation and preserves its other models and unrelated fields. To leave setup, press Ctrl+C; unfinished steps are not saved. Stop a running EAA Pi instance before changing its configuration, and restart it afterward.
+
+You can add tools and skills independently:
+
+```bash
+eaa-pi config add-mcp --workspace /path/to/workspace
+eaa-pi config add-skill /path/to/skill/dir --workspace /path/to/workspace
+```
+
+`add-mcp` asks for a unique server name and a transport: `http` for Streamable HTTP, `sse` for older web servers, or `stdio` for a locally launched program. Web connections accept a URL, optional bearer-token or OAuth authentication, and extra headers. Local connections accept a program, arguments entered one at a time without shell quotes, an optional working directory, and environment variables. Relative directory paths are resolved from the directory where you run the command. Local programs also inherit the launching terminal's environment. Header and environment values can use `$env:NAME` to refer to a terminal environment variable. Setup saves the entry in `.pi/mcp.json` and leaves existing servers intact. It does not start or test the server; connection happens when you next launch EAA Pi. For OAuth, complete authentication through the TUI's `/mcp-auth SERVER_NAME` command when prompted by the server.
+
+`add-skill` copies a folder containing `SKILL.md` into `.pi/skills/<folder-name>`, including its supporting files. Omit the source path to enter it at a prompt. Existing destination folders are never overwritten. Restart EAA Pi after adding a skill, then invoke it with `/skill:name`, using the name in its `SKILL.md`.
+
 ## Workspace
 
 `eaa-pi init --workspace DIR` creates an explicit configuration and data root:

@@ -14,7 +14,16 @@ function option(name: string, fallback: string): string {
   return args.splice(index, 2)[1];
 }
 if (command === "help" || command === "--help") {
-  console.log("eaa-pi init|doctor|serve|demo|pi [--workspace DIR] [--host HOST] [--port PORT]\nPi arguments follow --. Default workspace: current directory.");
+  console.log("eaa-pi init|config|doctor|serve|demo|pi [--workspace DIR] [--host HOST] [--port PORT]\neaa-pi config add-mcp [--workspace DIR]\neaa-pi config add-skill [SKILL_DIRECTORY] [--workspace DIR]\nPi arguments follow --. Default workspace: current directory.");
+} else if (command === "config") {
+  const workspace = resolve(option("--workspace", process.cwd()));
+  try {
+    const { configure } = await import("./configure.js");
+    await configure(workspace, args);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 } else if (command === "pi") {
   const workspace = initializeOps(resolve(option("--workspace", process.cwd())));
   migrateLegacySessions(workspace);
@@ -26,7 +35,7 @@ if (command === "help" || command === "--help") {
 } else {
   const workspace = initialize(resolve(option("--workspace", command === "demo" ? ".demo" : process.cwd())));
   configureEnvironment(workspace);
-  if (command === "init") console.log(`Initialized ${workspace}. Configure provider settings in .pi-experiment-ops/agent using pi-experiment-ops configure, or edit settings.json and models.json there. See docs/configuration.md. Configure .pi/mcp.json as needed, then run eaa-pi serve --workspace ${workspace}`);
+  if (command === "init") console.log(`Initialized ${workspace}. Run eaa-pi config --workspace ${workspace} for guided setup, then eaa-pi serve --workspace ${workspace} to start the WebUI.`);
   else if (command === "doctor") {
     const paths = adapterResources();
     const checks = [
