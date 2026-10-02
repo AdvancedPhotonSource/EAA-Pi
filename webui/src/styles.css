@@ -647,9 +647,20 @@ button {
   border: 1px solid #d9dde3;
   border-radius: 6px;
   display: block;
-  max-height: 234px;
+  height: 234px;
   object-fit: contain;
   width: 234px;
+}
+
+.eaa-image-frame {
+  overflow: hidden;
+}
+
+.eaa-image-frame img {
+  display: block;
+  height: 100%;
+  object-fit: inherit;
+  width: 100%;
 }
 
 .eaa-input-panel {
@@ -1549,7 +1560,7 @@ body.eaa-resizing-rows * {
   padding: 0;
 }
 
-.eaa-gallery-image-button img {
+.eaa-gallery-image {
   aspect-ratio: 1.2 / 1;
   display: block;
   object-fit: contain;

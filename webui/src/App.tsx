@@ -1,5 +1,6 @@
-import { CSSProperties, FormEvent, KeyboardEvent, MouseEvent, PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, FormEvent, KeyboardEvent, MouseEvent, PointerEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RuntimeControls, TerminalControls } from "./RuntimeControls";
+import { ViewportImage } from "./ViewportImage";
 import {
   Bot,
   CircleStop,
@@ -324,7 +325,7 @@ function CodeBlock({ content }: { content: unknown }) {
   );
 }
 
-function MessageView({
+const MessageView = memo(function MessageView({
   conversationId,
   index,
   message,
@@ -335,7 +336,7 @@ function MessageView({
   index: number;
   message: WebUIMessage;
   onImage: (src: string) => void;
-  onApproval: (decision: ApprovalDecision, approvalId?: string) => Promise<void>;
+  onApproval: (decision: ApprovalDecision, conversationId: string, approvalId?: string) => Promise<void>;
 }) {
   const [approvalSubmitted, setApprovalSubmitted] = useState(false);
   const [approvalRemainingMs, setApprovalRemainingMs] = useState<number | null>(null);
@@ -386,7 +387,7 @@ function MessageView({
   const submitApproval = async (decision: ApprovalDecision) => {
     if (approvalSubmitted || approvalExpired) return;
     setApprovalSubmitted(true);
-    await onApproval(decision, message.approval_id);
+    await onApproval(decision, conversationId, message.approval_id);
   };
 
   return (
@@ -420,7 +421,7 @@ function MessageView({
           <div className="eaa-message-images">
             {imageSources.map((source) => (
               <button className="eaa-image-button" key={source} type="button" onClick={() => onImage(source)}>
-                <img className="eaa-message-image" src={source} loading="lazy" decoding="async" alt="" />
+                <ViewportImage className="eaa-message-image" src={source} />
               </button>
             ))}
           </div>
@@ -450,7 +451,7 @@ function MessageView({
       </div>
     </article>
   );
-}
+});
 
 function ConversationTabs({
   conversations,
@@ -720,6 +721,28 @@ function HelpDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+const ImageStrip = memo(function ImageStrip({ images, onPreview, onJumpToMessage }: {
+  images: ImageItem[];
+  onPreview: (src: string) => void;
+  onJumpToMessage: (messageId: string) => void;
+}) {
+  return (
+    <div className="eaa-images">
+      {images.map((image) => (
+        <div className="eaa-sidebar-image-card" key={image.source}>
+          <button className="eaa-image-button" type="button" onClick={() => onPreview(image.source)}>
+            <ViewportImage className="eaa-sidebar-image" src={image.source} />
+          </button>
+          <button className="eaa-image-title" type="button" onClick={() => onJumpToMessage(image.messageDomId)}>
+            {image.title}
+          </button>
+        </div>
+      ))}
+      {!images.length ? <div className="eaa-empty-inline">No images yet.</div> : null}
+    </div>
+  );
+});
+
 function ImageGalleryDialog({
   images,
   onClose,
@@ -744,7 +767,7 @@ function ImageGalleryDialog({
           {images.map((image) => (
             <article className="eaa-gallery-card" key={image.source}>
               <button className="eaa-gallery-image-button" type="button" onClick={() => onPreview(image.source)}>
-                <img src={image.source} loading="lazy" decoding="async" alt="" />
+                <ViewportImage className="eaa-gallery-image" src={image.source} />
               </button>
               <button className="eaa-gallery-title" type="button" onClick={() => onJumpToMessage(image.messageDomId)}>
                 {image.title}
@@ -781,7 +804,6 @@ function App() {
   const [mcpReconnectStatuses, setMcpReconnectStatuses] = useState<Record<string, MCPReconnectStatus>>({});
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [sidebarImages, setSidebarImages] = useState<ImageItem[]>([]);
   const [logs, setLogs] = useState<RuntimeLogEntry[]>([]);
   const [toolExecutionQueue, setToolExecutionQueue] = useState<ToolExecutionQueueEntry[]>([]);
   const [messageQueue, setMessageQueue] = useState<MessageQueueEntry[]>([]);
@@ -797,7 +819,6 @@ function App() {
   const sidebarRef = useRef<HTMLElement>(null);
   const lowerPanelRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
-  const imagesRef = useRef<HTMLDivElement>(null);
   const logsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
@@ -1035,7 +1056,7 @@ function App() {
     window.MathJax.typesetPromise([messagesRef.current]).catch((error) => console.warn("MathJax typesetting failed:", error));
   }, [activeMessages, mathJaxReady]);
 
-  useEffect(() => {
+  const sidebarImages = useMemo(() => {
     const items: ImageItem[] = [];
     const seen = new Set<string>();
     activeMessages.forEach((message, index) => {
@@ -1055,7 +1076,7 @@ function App() {
       attached.forEach(addImage);
       if (role !== "system") parseContentImagePaths(message.content).forEach(addImage);
     });
-    setSidebarImages(items);
+    return items;
   }, [activeMessages, activeConversationId]);
 
   const upsertConversation = useCallback((conversation: RuntimeConversation, select = false) => {
@@ -1446,13 +1467,13 @@ function App() {
     return () => source.close();
   }, [applyStatus, mergeMessages, renderApprovalRequest, upsertConversation]);
 
-  const submitApproval = async (decision: ApprovalDecision, conversationId = activeConversationId, approvalId?: string) => {
+  const submitApproval = useCallback(async (decision: ApprovalDecision, conversationId = activeConversationId, approvalId?: string) => {
     await fetch(config.routes.approval, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversation_id: conversationId, decision, approval_id: approvalId ?? conversations.find(c => c.id === conversationId)?.pending_approval?.id }),
     });
-  };
+  }, [activeConversationId, conversations]);
 
   const changePermissionAutoAllow = async (enabled: boolean) => {
     setPermissionAutoAllow(enabled);
@@ -1646,12 +1667,12 @@ function App() {
     }
   };
 
-  const jumpToImageMessage = (messageId: string) => {
+  const jumpToImageMessage = useCallback((messageId: string) => {
     setActiveView("chat");
     requestAnimationFrame(() => {
       document.getElementById(messageId)?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
-  };
+  }, []);
 
   useEffect(() => {
     const close = (event: globalThis.KeyboardEvent) => {
@@ -1751,7 +1772,7 @@ function App() {
                         key={messageKey(message, index)}
                         message={message}
                         onImage={setPreviewImage}
-                        onApproval={(approved, approvalId) => submitApproval(approved, activeConversationId, approvalId)}
+                        onApproval={submitApproval}
                       />
                     ))}
                     {activeConversation?.terminated ? <div className="eaa-termination-marker">Subagent terminated</div> : null}
@@ -1855,19 +1876,7 @@ function App() {
                     <Maximize2 size={16} aria-hidden="true" />
                   </button>
                 </div>
-                <div className="eaa-images" ref={imagesRef}>
-                  {sidebarImages.map((image) => (
-                    <div className="eaa-sidebar-image-card" key={image.source}>
-                      <button className="eaa-image-button" type="button" onClick={() => setPreviewImage(image.source)}>
-                        <img className="eaa-sidebar-image" src={image.source} loading="lazy" decoding="async" alt="" />
-                      </button>
-                      <button className="eaa-image-title" type="button" onClick={() => jumpToImageMessage(image.messageDomId)}>
-                        {image.title}
-                      </button>
-                    </div>
-                  ))}
-                  {!sidebarImages.length ? <div className="eaa-empty-inline">No images yet.</div> : null}
-                </div>
+                <ImageStrip images={sidebarImages} onPreview={setPreviewImage} onJumpToMessage={jumpToImageMessage} />
               </div>
               <button
                 aria-label="Resize image and log panels"
