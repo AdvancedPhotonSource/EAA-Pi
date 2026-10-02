@@ -2,7 +2,7 @@
 # Downloadable release installer; also accepts a local release archive.
 set -eu
 fail() { printf '%s\n' "Error: $*" >&2; exit 1; }
-version=0.1.0
+version=1.0.0
 prefix=${XDG_DATA_HOME:-"$HOME/.local/share"}/eaa-pi
 bin_dir=$HOME/.local/bin
 archive=
@@ -11,7 +11,7 @@ while [ "$#" -gt 0 ]; do
     --help|-h)
       cat <<'HELP'
 Usage: sh install.sh [options]
-  --version VERSION  GitHub release version (default 0.1.0)
+  --version VERSION  GitHub release version (default 1.0.0)
   --prefix DIR       Installation directory (default ~/.local/share/eaa-pi)
   --bin-dir DIR      Launcher directory (default ~/.local/bin)
   --archive FILE     Install a local release tarball

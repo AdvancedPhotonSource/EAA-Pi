@@ -1,6 +1,6 @@
 {
   "name": "eaa-pi",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Standalone EAA web frontend for Pi and community extensions",
   "type": "module",
   "engines": {

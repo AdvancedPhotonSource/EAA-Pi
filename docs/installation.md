@@ -5,8 +5,8 @@
 The root `install.sh` can be downloaded and piped to `sh`. It requires Linux, Node.js ≥22.19, npm, Git, Bash, uv, curl, tar, and sha256sum. It downloads the selected GitHub release tarball and checksum, verifies SHA-256, installs the package, provisions its Python runtime, and creates the `eaa-pi` command.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AdvancedPhotonSource/EAA-Pi/v0.1.0/install.sh | \
-  sh -s -- --version 0.1.0
+curl -fsSL https://raw.githubusercontent.com/AdvancedPhotonSource/EAA-Pi/v1.0.0/install.sh | \
+  sh -s -- --version 1.0.0
 ```
 
 The installer adds the launcher directory to `~/.bashrc` for Bash or `${ZDOTDIR:-$HOME}/.zshrc` for Zsh, according to `$SHELL`. It preserves existing settings and avoids duplicate entries on reruns. Open a new terminal or run the printed `source` command to activate it in your current shell:
@@ -23,7 +23,7 @@ Installation defaults to `${XDG_DATA_HOME:-$HOME/.local/share}/eaa-pi`, with a l
 For a downloaded package, verify its published checksum and install locally:
 
 ```bash
-sh install.sh --archive /path/to/eaa-pi-0.1.0.tgz
+sh install.sh --archive /path/to/eaa-pi-1.0.0.tgz
 ```
 
 Rerunning the installer reuses an installed release and rechecks Python provisioning. Each release is stored under `PREFIX/releases/VERSION-DIGEST`; the launcher switches after setup succeeds. To upgrade or roll back, stop the server and rerun the installer for the desired version. Workspaces remain at the locations you selected.
@@ -76,7 +76,7 @@ Install the resulting tarball on another Linux machine:
 
 ```bash
 mkdir -p /path/to/eaa-install
-npm install --prefix /path/to/eaa-install --omit=dev --legacy-peer-deps /path/to/eaa-pi-0.1.0.tgz
+npm install --prefix /path/to/eaa-install --omit=dev --legacy-peer-deps /path/to/eaa-pi-1.0.0.tgz
 bash /path/to/eaa-install/node_modules/eaa-pi/scripts/install.sh /path/to/workspace
 /path/to/eaa-install/node_modules/.bin/eaa-pi serve --workspace /path/to/workspace
 ```
@@ -98,7 +98,7 @@ npm run test:package
 mkdir -p /tmp/eaa-pi-release
 npm pack --pack-destination /tmp/eaa-pi-release
 cd /tmp/eaa-pi-release
-sha256sum eaa-pi-0.1.0.tgz > eaa-pi-0.1.0.tgz.sha256
+sha256sum eaa-pi-1.0.0.tgz > eaa-pi-1.0.0.tgz.sha256
 ```
 
 Publish the matching tag from the tested commit in `AdvancedPhotonSource/EAA-Pi` and attach both files to its GitHub Release. The installer URL becomes usable once the tag includes `install.sh` and both assets are attached. Retain previous release assets for rollback.

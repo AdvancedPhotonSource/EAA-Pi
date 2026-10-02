@@ -13,8 +13,8 @@ EAA Pi currently supports **Linux**. Before installing, you need [Node.js](https
 Open a terminal and run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AdvancedPhotonSource/EAA-Pi/v0.1.0/install.sh | \
-  sh -s -- --version 0.1.0
+curl -fsSL https://raw.githubusercontent.com/AdvancedPhotonSource/EAA-Pi/v1.0.0/install.sh | \
+  sh -s -- --version 1.0.0
 ```
 
 This downloads the release and installs the `eaa-pi` command. It also updates your Bash or Zsh startup settings so that the command is available in new terminals. After installation, **open a new terminal**, or run the `source` command printed by the installer. Then follow the quickstart below.
