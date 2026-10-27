@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initialize, agentDir, PACKAGE_ROOT, readJson, writeJson } from "../dist/server/config.js";
@@ -40,16 +40,37 @@ test("EAA delegates standalone MCP and skill addition to the shared implementati
   const skill = join(root, "analysis");
   mkdirSync(skill);
   writeFileSync(join(skill, "SKILL.md"), "---\nname: analysis\ndescription: Analyze data\n---\nAnalyze it.\n");
-  passed(run(["add-skill", skill]));
+  const result = run(["add-skill", skill], [""]);
+  passed(result);
+  assert.match(result.stdout, /\(copy\/link\) \[copy\]/);
+  assert.equal(lstatSync(join(workspace, ".pi/skills/analysis")).isSymbolicLink(), false);
   assert.equal(readFileSync(join(workspace, ".pi/skills/analysis/SKILL.md"), "utf8"), readFileSync(join(skill, "SKILL.md"), "utf8"));
   assert.equal(readJson(join(workspace, "eaa-pi.json")).port, 8010);
 });
+
+for (const useFlag of [false, true]) {
+  test(`EAA delegates skill linking selected through ${useFlag ? "--link" : "the prompt"}`, t => {
+    const { root, workspace, run } = fixture(t);
+    const skill = join(root, "analysis");
+    mkdirSync(skill);
+    writeFileSync(join(skill, "SKILL.md"), "---\nname: analysis\ndescription: Analyze data\n---\nAnalyze it.\n");
+    const result = run(["add-skill", skill, ...(useFlag ? ["--link"] : [])], useFlag ? [] : ["link"]);
+    passed(result);
+    if (useFlag) assert.doesNotMatch(result.stdout, /copy\/link/);
+    const installed = join(workspace, ".pi/skills/analysis");
+    assert.ok(lstatSync(installed).isSymbolicLink());
+    assert.equal(realpathSync(installed), realpathSync(skill));
+    writeFileSync(join(skill, "SKILL.md"), "Updated instructions");
+    assert.equal(readFileSync(join(installed, "SKILL.md"), "utf8"), "Updated instructions");
+  });
+}
 
 test("delegated help and invalid arguments do not initialize EAA workspace files", t => {
   const { workspace, run } = fixture(t);
   const result = run(["--help"]);
   passed(result);
   assert.match(result.stdout, /eaa-pi config add-mcp/);
+  assert.match(result.stdout, /add-skill .*\[--link\]/);
   assert.equal(existsSync(workspace), false);
   assert.equal(run(["not-a-command"]).status, 1);
   assert.equal(existsSync(workspace), false);

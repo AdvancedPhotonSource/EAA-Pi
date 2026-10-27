@@ -13,8 +13,8 @@ EAA Pi currently supports **Linux**. Before installing, you need [Node.js](https
 Open a terminal and run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AdvancedPhotonSource/EAA-Pi/v1.0.0/install.sh | \
-  sh -s -- --version 1.0.0
+curl -fsSL https://raw.githubusercontent.com/AdvancedPhotonSource/EAA-Pi/v1.1.0/install.sh | \
+  sh -s -- --version 1.1.0
 ```
 
 This downloads the release and installs the `eaa-pi` command. It also updates your Bash or Zsh startup settings so that the command is available in new terminals. After installation, **open a new terminal**, or run the `source` command printed by the installer. Then follow the quickstart below.
@@ -68,7 +68,7 @@ eaa-pi config --workspace ~/eaa-workspace
 
 It uses pi-experiment-ops' shared setup for your provider and model, and also asks for the web interface port. Choose `argo` for Argonne's Argo service, or `openai` for a service with an OpenAI-compatible chat API. If your provider needs an API key, setup asks for the name of an environment variable that holds it and shows you how to set that variable before launching EAA Pi.
 
-Setup also offers to add an MCP server and copy a skill. You can skip both and add them later using steps 4 and 5. Existing settings are preserved unless you choose to update them. For other provider types or manual editing, see the [provider configuration guide](docs/configuration.md#real-provider-authentication).
+Setup also offers to add an MCP server and a skill. You can skip both and add them later using steps 4 and 5. Existing settings are preserved unless you choose to update them. For other provider types or manual editing, see the [provider configuration guide](docs/configuration.md#real-provider-authentication).
 
 ### 3. Choose the default provider and model
 
@@ -105,7 +105,7 @@ A **skill** is a set of written instructions for a recurring task. To add a skil
 eaa-pi config add-skill /path/to/skill/dir --workspace ~/eaa-workspace
 ```
 
-You can leave out the path and enter it when asked. The command copies the entire folder into `.pi/skills`, including supporting files. The folder must contain `SKILL.md`; an existing skill folder with the same name is kept unchanged.
+You can leave out the path and enter it when asked. The command asks whether to copy the entire folder, including supporting files, or create a symbolic link in `.pi/skills`. Press Enter to copy, or add `--link` to select linking without the choice prompt. Links reflect source edits and require the source folder to remain available. The folder must contain `SKILL.md`; an existing destination with the same name is kept unchanged.
 
 You can also create a skill directly. For example, write `.pi/skills/analyze-data/SKILL.md` with:
 

@@ -14,7 +14,7 @@ function option(name: string, fallback: string): string {
   return args.splice(index, 2)[1];
 }
 if (command === "help" || command === "--help") {
-  console.log("eaa-pi init|config|doctor|serve|demo|pi [--workspace DIR] [--host HOST] [--port PORT]\neaa-pi config add-mcp [--workspace DIR]\neaa-pi config add-skill [SKILL_DIRECTORY] [--workspace DIR]\nPi arguments follow --. Default workspace: current directory.");
+  console.log("eaa-pi init|config|doctor|serve|demo|pi [--workspace DIR] [--host HOST] [--port PORT]\neaa-pi config add-mcp [--workspace DIR]\neaa-pi config add-skill [SKILL_DIRECTORY] [--link] [--workspace DIR]\nPi arguments follow --. Default workspace: current directory.");
 } else if (command === "config") {
   const workspace = resolve(option("--workspace", process.cwd()));
   try {
